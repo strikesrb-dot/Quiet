@@ -40,7 +40,9 @@ published translation. Never edit the Arabic by hand.
 ## Deploy
 
 Netlify publishes `site/` as it is (see `netlify.toml`) and bundles the one function; the pages have no build step.
-Every push to `main` deploys.
+The Netlify project (samt-quiet) is not linked to this repository's Git builds, so a push alone does not deploy: each
+release is uploaded with Netlify's deploy tool from a clean checkout. To make every push to `main` deploy, link the
+repository in Netlify (Project configuration, Build & deploy, Link repository).
 
 ## Change it
 

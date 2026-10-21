@@ -1,9 +1,8 @@
 Samt v3
 =======
 
-Samt is already online at https://samt-quiet.netlify.app (it updates itself from
-GitHub). This zip is a copy of the same pages, for keeping or for putting up
-somewhere else.
+Samt is already online at https://samt-quiet.netlify.app. This zip is a copy of
+the same pages, for keeping or for putting up somewhere else.
 
 The microphone only works when Samt is opened from a web address (https),
 not from the Files app.
