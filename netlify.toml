@@ -1,0 +1,16 @@
+# Samt: a static site with no build step. Netlify publishes the prebuilt site/ folder on every push to main.
+# To change the pages, edit src/ and run `python3 scripts/build.py`, then commit site/ with it.
+[build]
+  publish = "site"
+
+# The voice model is 6.4 MB and changes rarely: let browsers keep it for a week.
+[[headers]]
+  for = "/neural/voice-model.onnx"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
+    Content-Type = "application/octet-stream"
+
+[[headers]]
+  for = "/*/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
