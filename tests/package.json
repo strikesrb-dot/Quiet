@@ -1,0 +1,5 @@
+{
+  "private": true,
+  "type": "commonjs",
+  "description": "Samt browser tests (CommonJS; the repo root is an ES module package for the Netlify function)"
+}

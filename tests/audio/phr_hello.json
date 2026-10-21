@@ -1,0 +1,1 @@
+[{"file": "phr_me_hello_0", "start": 2.0, "end": 2.624, "role": "me", "kind": "phrase_enroll", "phrase": "hello"}, {"file": "phr_me_hello_1", "start": 3.824, "end": 4.436, "role": "me", "kind": "phrase_enroll", "phrase": "hello"}, {"file": "phr_me_hello_2", "start": 5.636, "end": 6.043, "role": "me", "kind": "phrase_enroll", "phrase": "hello"}]

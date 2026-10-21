@@ -71,7 +71,8 @@ reminders in `reminders.json` and the fonts in `fonts/`. After an edit:
 python3 scripts/build.py   # rewrites site/index.html, site/light/, site/neural/, site/fonts/ (leaves the model alone)
 ```
 
-Then check the pages in WebKit (Safari's engine) at phone and iPad widths before pushing.
+Then run the browser tests (`tests/README.md`): they drive the built pages in WebKit (Safari's engine) with a fake
+microphone and check every page at phone and iPad widths. Ship only when they pass.
 
 ## Notes
 
