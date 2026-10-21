@@ -17,6 +17,13 @@
    large title and glyph tile, inset grouped lists (caption, group, footnote), the dark capsule for the one main action,
    glass and plain buttons, one segmented control, one stepper, an action sheet for anything that can't be undone, and a
    toast. Text floor 16. Corners 8 · 14 · 26 · 32 · capsule. 12 between controls; taps 44. */
+/* Arabic is Amiri (the Amiri project, SIL Open Font License 1.1, see fonts/OFL.txt): Amiri Quran for the verses, Amiri
+   for all other Arabic (the owner's pick, 2026-10-21). "Samt Arabic" is the same Amiri file limited to Arabic letters and
+   put first in the UI stack, so Arabic inside an English line (ﷺ, a sūrah's name) is Amiri too and English is untouched. */
+@font-face { font-family: "Amiri Quran"; src: url("../fonts/amiri-quran-400.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Amiri"; src: url("../fonts/amiri-400.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+@font-face { font-family: "Samt Arabic"; src: url("../fonts/amiri-400.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-088E, U+0890-0891, U+0897-08E1, U+08E3-08FF, U+FB50-FDFF, U+FE70-FE74, U+FE76-FEFC; }
 html.ql {
   --q-page:#f9f9f7; --q-chrome:#f3f3f0; --q-group:#ffffff; --q-fill:#f0efec; --q-press:rgba(27,24,18,.085); --q-selected:#e7e6e0;
   --q-ink:#1b1812; --q-ink2:#52514e; --q-ink3:#6e6d68; --q-value:var(--q-ink3); --q-chev:#888780;
@@ -25,10 +32,11 @@ html.ql {
   --q-glass:color-mix(in srgb, rgba(252,252,249,.82), #fcfcf9 35%); --q-glass-rim:inset 0 0 0 1px #fff; --q-glass-edge:0 0 0 .5px rgba(0,0,0,.10);
   --q-sh-glass:0 4px 32px rgba(0,0,0,.11); --q-blur:blur(20px) saturate(1.7); --q-sh-sheet:0 24px 64px -16px rgba(0,0,0,.25);
   --q-sh-thumb:0 1px 3px rgba(0,0,0,.12); --q-track:#e3e2dd; --q-mark:#a8502e;
-  --q-ui:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
-  --q-ar:"SF Arabic", "Geeza Pro", "Noto Naskh Arabic", "Arabic Typesetting", serif;
+  --q-ui:"Samt Arabic", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --q-ar:"Amiri", "SF Arabic", "Geeza Pro", "Noto Naskh Arabic", "Arabic Typesetting", serif;
+  --q-quran:"Amiri Quran", "Amiri", "SF Arabic", "Geeza Pro", serif;
   --q-r-icon:8px; --q-r-ctl:14px; --q-r-group:26px; --q-r-sheet:32px; --q-r-cap:999px;
-  --q-t-min:16px; --q-t-body:17px; --q-t-t3:20px; --q-t-t2:22px; --q-t-t1:28px; --q-t-large:34px; --q-t-hero:112px; --q-t-hero-s:84px; --q-ar-26:26px;
+  --q-t-min:16px; --q-t-body:17px; --q-t-t3:20px; --q-t-t2:22px; --q-t-t1:28px; --q-t-large:34px; --q-t-hero:112px; --q-t-hero-s:84px; --q-ar-26:26px; --q-ar-30:30px;
   --q-sp:12px; --q-row-min:54px; --q-row-px:20px; --tap:44px;
   --q-ease:cubic-bezier(.32,.72,0,1); --q-ease-back:cubic-bezier(.34,1.56,.64,1); --q-rise:500ms var(--q-ease);
   color-scheme: light;
@@ -182,9 +190,11 @@ html.ql body.theme-dark .btn.strong.is-press { background-image: linear-gradient
 /* a reminder: the Arabic is the content; its meaning opens on a tap */
 .remind { display: grid; gap: 6px; padding: 14px 16px; border-radius: var(--q-r-ctl); background: var(--q-fill); text-align: center; min-width: 0; }
 .rem { display: grid; gap: 6px; padding: 16px var(--q-row-px); text-align: center; }
-.remind .ar, .rem .ar { margin: 0; font: 400 var(--q-ar-26)/1.9 var(--q-ar); overflow-wrap: anywhere; }
+.remind .ar, .rem .ar { margin: 0; font: 400 var(--q-ar-30)/2 var(--q-ar); overflow-wrap: anywhere; text-wrap: balance; } /* Amiri reads small: 30 px, and line height 2 keeps its low marks off the line under it */
+.remind .ar.quran, .rem .ar.quran { font-family: var(--q-quran); padding-bottom: .35em; } /* Amiri Quran's low marks reach up to 9 px under its line box (4:114, measured) */
 .ref { margin: 0; color: var(--q-ink3); font-size: var(--q-t-min); }
 .ref .arn { font: 400 20px/1.2 var(--q-ar); }
+.saw { font-size: 1.45em; line-height: 0; vertical-align: -.08em; } /* ﷺ, readable without growing the line */
 .mean { margin: 0; color: var(--q-ink2); font-size: var(--q-t-min); line-height: 1.45; text-align: start; }
 .remind .btn.plain, .rem .btn.plain { justify-self: center; font-size: var(--q-t-min); }
 
@@ -252,8 +262,58 @@ html.ql body.theme-dark .btn.strong.is-press { background-image: linear-gradient
 .summary b { color: var(--q-acc); font-size: var(--q-t-min); }
 .summary p { margin: 0; white-space: pre-wrap; }
 .sheet .cap { padding: 0 4px; }
+.sheet .foot { padding: 0; }
 .sheet.paged { background: var(--q-page); } /* a sheet that holds grouped lists sits on the page tone, as the page does */
 #txtScrim { z-index: 47; } #txtPanel { z-index: 48; }
+
+/* views: one shows at a time. Home, the session, and pages under Home with a Back and a large title */
+.view { display: grid; gap: 24px; min-width: 0; }
+.pagehead { display: flex; align-items: center; min-height: var(--tap); margin-bottom: -16px; }
+.back { display: inline-flex; align-items: center; gap: 2px; min-height: var(--tap); padding: 0 12px 0 0; border: 0; background: none; color: var(--q-acc); font: 600 var(--q-t-body)/1 var(--q-ui); }
+.back .ic { width: 20px; height: 20px; stroke-width: 2.4; }
+.ptitle { margin: 0; font: 800 var(--q-t-large)/1.1 var(--q-ui); letter-spacing: -.02em; }
+.ctitle { margin: 0; font: 700 var(--q-t-t2)/1.25 var(--q-ui); letter-spacing: -.02em; }
+.cbody { margin: 0; color: var(--q-ink2); line-height: 1.45; }
+.cnote { margin: 0; color: var(--q-ink3); font-size: var(--q-t-min); line-height: 1.4; }
+.cnote.center { text-align: center; margin-top: -10px; }
+.cstatus { margin: 0; color: var(--q-ink2); font-size: var(--q-t-min); font-weight: 600; }
+.hero-btn { justify-self: center; border: 0; padding: 0 12px; background: none; color: inherit; border-radius: var(--q-r-ctl); }
+.btn.small { font-size: var(--q-t-min); justify-self: center; }
+.today { margin: 0; text-align: center; color: var(--q-ink2); font-size: var(--q-t-min); font-variant-numeric: tabular-nums; }
+.today b { color: var(--q-ink); }
+.today.over b { color: var(--q-danger); }
+.quick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--q-sp); }
+.btn.qt { flex-direction: column; gap: 6px; min-height: 80px; padding: 10px 8px; border-radius: var(--q-r-group); }
+.btn.qt .ic { width: 24px; height: 24px; color: var(--q-acc); }
+.tip { display: grid; gap: 4px; padding: 14px 16px; border-radius: var(--q-r-ctl); background: var(--q-fill); }
+.tip p { margin: 0; font-size: var(--q-t-min); color: var(--q-ink2); line-height: 1.4; }
+.tip .btn { justify-self: start; padding: 0; }
+
+/* the session: its own page colour, one big status, only the session's tools */
+body.in-session { --q-page: color-mix(in srgb, var(--q-acc) 9%, #f9f9f7); }
+html.ql body.theme-dark.in-session { --q-page: color-mix(in srgb, var(--q-acc) 12%, #20201f); }
+body:not([data-view="home"]) #appHead { display: none; } /* a page shows its own Back and title; a session shows only itself */
+body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a session's tint) fills the screen when the content is short */
+.session { gap: 16px; }
+.s-top { display: flex; justify-content: space-between; align-items: center; gap: var(--q-sp); min-height: var(--tap); }
+.s-kind { display: inline-flex; align-items: center; gap: 8px; color: var(--q-acc); font: 800 var(--q-t-min)/1 var(--q-ui); letter-spacing: .06em; text-transform: uppercase; }
+.s-kind::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--q-acc); }
+.session .quietl { margin: 0; font-size: var(--q-t-body); }
+.session .live { justify-self: center; }
+.s-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--q-sp); }
+.s-row .btn { min-height: 54px; padding: 0 12px; }
+.s-row #stop { grid-column: 1 / -1; }
+@media (min-width: 700px) { .s-row { grid-template-columns: 1fr 1fr 1.5fr; } .s-row #stop { grid-column: auto; }
+  /* on a tablet or a computer a session sits in the middle of the screen, like a clock, not in its top half */
+  body.in-session .win { min-height: calc(100vh - 52px); min-height: calc(100dvh - max(20px, env(safe-area-inset-top, 0px)) - max(32px, env(safe-area-inset-bottom, 0px))); align-content: center; } }
+.btn.hold { gap: 10px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
+.ring { width: 24px; height: 24px; flex: none; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke: currentColor; stroke-width: 2.6; }
+.ring .track { opacity: .3; }
+.ring .fill { stroke-dasharray: 100; stroke-dashoffset: 100; }
+.btn.hold.holding .ring .fill { stroke-dashoffset: 0; transition: stroke-dashoffset 2s linear; }
+#detailsBtn { justify-self: center; }
+.ic.up { width: 16px; height: 16px; transform: rotate(-90deg); }
 
 @media (prefers-reduced-motion: reduce) {
   .showv, .show-body, .tlbar > i, .sw, .sw::after { transition: opacity 150ms linear !important; } /* overrides the springs: Reduce Motion is a 150 ms fade */
@@ -265,7 +325,7 @@ html.ql body.theme-dark .btn.strong.is-press { background-image: linear-gradient
 </style>
 
 </head>
-<body>
+<body data-view="home">
 <script>(function(){try{var t=localStorage.getItem('samt.theme')||'auto';var d=t==='night'||(t==='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);if(d)document.body.classList.add('theme-dark');}catch(e){}})();</script>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-hush" viewBox="0 0 24 24"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 4v-4A2.5 2.5 0 0 1 4 13.5z"/><path d="M8.5 10h7"/></symbol>
@@ -278,157 +338,139 @@ html.ql body.theme-dark .btn.strong.is-press { background-image: linear-gradient
   <symbol id="i-sign" viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="11" rx="2"/><path d="M12 14.5v6M8.5 20.5h7M8 9h8"/></symbol>
   <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H14a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z"/></symbol>
   <symbol id="i-speak" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20h16"/><path d="M7 16v-5M12 16V6M17 16v-8"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-turn" viewBox="0 0 24 24"><path d="M4.5 10.5a8 8 0 0 1 14-3.5l1.5 1.5"/><path d="M20 4v4.5h-4.5"/><path d="M19.5 13.5a8 8 0 0 1-14 3.5L4 15.5"/><path d="M4 20v-4.5h4.5"/></symbol>
 </svg>
 <main class="win">
-  <header class="head">
+  <header class="head" id="appHead">
     <span class="tile" aria-hidden="true"><svg class="ic"><use href="#i-hush"/></svg></span>
     <div class="titles"><h1 class="large">Samt <span class="tier">Light</span></h1><p class="sub">Your own voice, a moment late, in your headphones</p></div>
-    <a class="btn plain" href="../">Versions</a>
   </header>
+  <p id="note" class="note" role="alert" hidden></p>
 
-  <section class="card glass" aria-label="Session">
-    <div id="readout" class="hero">30:00</div>
-    <p id="quietLine" class="quietl" aria-live="off" hidden>Quiet for <b id="quietFor">0:00</b></p>
-    <div id="live" class="live" data-state="off" aria-live="polite"><span class="dot"></span><span id="liveText">Loading</span></div>
-    <div class="meter" aria-hidden="true"><i id="level"></i></div>
-    <div class="seg" id="kindSeg" role="radiogroup" aria-label="Kind of session"></div>
-    <div class="actions">
+  <!-- HOME: teach your voice first, or start a session. Cards, the sign and reminders work either way. -->
+  <section id="vHome" class="view" aria-label="Home">
+    <section id="setupCard" class="card glass" aria-labelledby="setupTitle" hidden>
+      <h2 class="ctitle" id="setupTitle">Teach Samt your voice</h2>
+      <p class="cbody">Read a short passage out loud, about 45 seconds, wearing the headphones you'll use. Then hear the echo once, about 10 seconds.</p>
+      <p class="cstatus" id="setupModel" hidden></p>
+      <button id="setupStart" class="btn strong" type="button">Start reading</button>
+      <p class="cnote">Sessions open once Samt knows your voice. Cards, the sign and reminders work now.</p>
+    </section>
+
+    <section id="readyCard" class="card glass" aria-label="Start a session" hidden>
+      <button id="readout" class="hero hero-btn" type="button" aria-describedby="lenHint">30:00</button>
+      <p class="cnote center" id="lenHint">Tap the time to change it</p>
+      <div class="seg" id="kindSeg" role="radiogroup" aria-label="Kind of session"></div>
+      <button id="convLine" class="btn plain small" type="button" hidden></button>
       <button id="go" class="btn strong" type="button">Start silence</button>
       <button id="test" class="btn glass" type="button">Test without echo</button>
-      <button id="pass" class="btn glass" type="button" hidden>Talk freely, 10 s</button>
+      <p class="today" id="todayLine"></p>
+    </section>
+
+    <div class="quick" role="group" aria-label="Without your voice">
+      <button id="openCards" class="btn glass qt" type="button"><svg class="ic" aria-hidden="true"><use href="#i-card"/></svg><span>Card</span></button>
+      <button id="openSign" class="btn glass qt" type="button"><svg class="ic" aria-hidden="true"><use href="#i-sign"/></svg><span>Sign</span></button>
+      <button id="openRemind" class="btn glass qt" type="button"><svg class="ic" aria-hidden="true"><use href="#i-book"/></svg><span>Reminders</span></button>
     </div>
+
+    <div class="group">
+      <button class="row gl" id="toProgress" type="button" hidden><svg class="ic"><use href="#i-chart"/></svg><span class="rt">Progress</span><span class="rv" id="progressStatus"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+      <button class="row gl" id="toSettings" type="button"><svg class="ic"><use href="#i-gear"/></svg><span class="rt">Settings</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+    </div>
+  </section>
+
+  <!-- SESSION: only what a running session needs; the rest of the app waits until it ends -->
+  <section id="vSession" class="view session" aria-label="Session" hidden>
+    <div class="s-top"><span id="sKind" class="s-kind">Silence</span><span id="quietLine" class="quietl">Quiet for <b id="quietFor">0:00</b></span></div>
+    <div id="sReadout" class="hero" role="timer" aria-label="Time left">30:00</div>
+    <div id="live" class="live" data-state="off" aria-live="polite"><span class="dot"></span><span id="liveText">Listening</span></div>
+    <div class="meter" aria-hidden="true"><i id="level"></i></div>
     <div id="remind" class="remind" hidden></div>
-    <p id="note" class="note" role="alert" hidden></p>
+    <button id="resume" class="btn strong" type="button" hidden>Resume</button>
+    <button id="pass" class="btn glass" type="button">Talk freely, 10 s</button>
+    <div class="s-row">
+      <button id="sCard" class="btn glass" type="button"><svg class="ic" aria-hidden="true"><use href="#i-card"/></svg>Card</button>
+      <button id="sSign" class="btn glass" type="button"><svg class="ic" aria-hidden="true"><use href="#i-sign"/></svg>Sign</button>
+      <button id="stop" class="btn strong hold" type="button"><svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="track" cx="12" cy="12" r="9"/><circle class="fill" cx="12" cy="12" r="9" pathLength="100"/></svg><span id="stopText">Hold to stop</span></button>
+    </div>
+    <button id="detailsBtn" class="btn plain" type="button"><svg class="ic up" aria-hidden="true"><use href="#i-chev"/></svg>Details</button>
   </section>
 
-  <section class="sec" aria-labelledby="capQuiet">
-    <h2 class="cap" id="capQuiet">Without your voice</h2>
-    <div class="group">
-      <button class="row gl" id="openCards" type="button"><svg class="ic"><use href="#i-card"/></svg><span class="rt">Show a card</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
-      <button class="row gl" id="openSign" type="button"><svg class="ic"><use href="#i-sign"/></svg><span class="rt">In-silence sign</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
-      <button class="row gl" id="openRemind" type="button"><svg class="ic"><use href="#i-book"/></svg><span class="rt">Reminders</span><span class="rv" id="remindStatus">On</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
-    </div>
-    <p class="foot">A card or the sign fills the screen for the person you're with. Speak reads a card out loud through the iPad's speaker, so take your headphones off first or only you will hear it.</p>
+  <!-- PROGRESS -->
+  <section id="vProgress" class="view" aria-labelledby="pgTitle" hidden>
+    <div class="pagehead"><button class="back" type="button" data-back><svg class="ic" aria-hidden="true"><use href="#i-back"/></svg>Samt</button></div>
+    <h2 class="ptitle" id="pgTitle">Progress</h2>
+    <section class="sec" aria-labelledby="capToday">
+      <h3 class="cap" id="capToday">Today</h3>
+      <div class="group">
+        <div class="row col"><div class="tl-top"><span>Talk time <b id="todayTalk">0:00</b> of <span id="todayBudget">20:00</span></span><span id="todayLeft">20:00 left</span></div><div class="tlbar" id="budgetTrack" aria-hidden="true"><i id="budgetBar"></i></div></div>
+        <div class="row"><span class="rt" id="budgetLabel">Daily talk budget</span><div class="stp" role="group" aria-labelledby="budgetLabel"><button id="budgetDown" type="button" aria-label="Smaller budget">−</button><output id="budgetOut">20 min</output><button id="budgetUp" type="button" aria-label="Bigger budget">+</button></div></div>
+        <div class="row"><span class="rt">Days within budget</span><span class="rv" id="streak">0</span></div>
+      </div>
+      <p class="foot">Talk time is your talking, not counting the phrases that pass.</p>
+    </section>
+    <section class="sec" aria-label="The last 7 days">
+      <div class="group week">
+        <div class="wk-head"><span>Talk time, last 7 days</span><span id="weekSel"></span></div>
+        <div class="wk-plot" id="weekPlot" data-nopress><div class="wk-budget" id="weekBudget"></div></div>
+        <div class="wk-days" id="weekDays" aria-hidden="true"></div>
+        <table class="sr" id="weekTable"></table>
+      </div>
+      <p class="foot">The line across the chart is your daily budget. Tap a day to see its talk time.</p>
+    </section>
+    <section class="sec" aria-labelledby="capHist">
+      <h3 class="cap" id="capHist">Past sessions</h3>
+      <div class="group" id="histList"></div>
+      <p class="foot">Light and Neural on this device share the budget and the past sessions.</p>
+    </section>
   </section>
 
-  <section class="sec" aria-labelledby="capSession">
-    <h2 class="cap" id="capSession">This session</h2>
-    <div class="group">
-      <div class="row col"><div class="tl-top"><span>You <b id="tlMe">0%</b></span><span>Others <b id="tlOth">0%</b></span></div><div class="tlbar" aria-hidden="true"><i id="tlBar"></i></div></div>
-      <div class="row"><span class="rt">Times echoed</span><span class="rv" id="cTalk">0</span></div>
-      <div class="row"><span class="rt">Talk time</span><span class="rv" id="cTalkTime">0:00</span></div>
-      <div class="row"><span class="rt">Phrases passed</span><span class="rv" id="cPass">0</span></div>
-      <div class="row"><span class="rt">Short replies</span><span class="rv" id="cShort">0</span></div>
-      <div class="row"><span class="rt">Others ignored</span><span class="rv" id="cOther">0</span></div>
-      <div class="row"><span class="rt">Talked over someone</span><span class="rv" id="cInt">0</span></div>
-      <div class="row" id="nudgeRow" hidden><span class="rt">Nudges</span><span class="rv" id="cNudge">0</span></div>
-    </div>
-    <div id="last" class="group" hidden>
-      <div class="row"><span class="rt">Last</span><span class="rv wrap" id="lastText"></span></div>
-      <div class="row btns"><button id="wasMe" class="btn plain" type="button">That was me</button><button id="notMe" class="btn plain" type="button">Not me</button></div>
-    </div>
-    <p class="foot">You and Others: how much of the talking Samt heard was you. Talk time is your talking, not counting the phrases that pass.</p>
+  <!-- SETTINGS: a short index, grouped by thing; each row shows its value and opens on its own (never deeper than this) -->
+  <section id="vSettings" class="view" aria-labelledby="stTitle" hidden>
+    <div class="pagehead"><button class="back" type="button" data-back><svg class="ic" aria-hidden="true"><use href="#i-back"/></svg>Samt</button></div>
+    <h2 class="ptitle" id="stTitle">Settings</h2>
+    <section class="sec" aria-labelledby="capTeach">
+      <h3 class="cap" id="capTeach">Your voice</h3>
+      <div class="group">
+        <button class="row gl" id="teachVoice" type="button"><svg class="ic"><use href="#i-mic"/></svg><span class="rt">Your voice</span><span class="rv" id="voiceStatus">Not taught</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+        <button class="row gl" id="teachOthers" type="button"><svg class="ic"><use href="#i-people"/></svg><span class="rt">Other voices</span><span class="rv" id="othStatus">Recommended</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+        <button class="row gl" id="toPhrases" type="button"><svg class="ic"><use href="#i-hush"/></svg><span class="rt">Phrases that pass</span><span class="rv" id="phrCount"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+      </div>
+    </section>
+    <section class="sec" aria-labelledby="capSess">
+      <h3 class="cap" id="capSess">Sessions</h3>
+      <div class="group">
+        <button class="row" id="toConv" type="button"><span class="rt">Conversation</span><span class="rv" id="convStatus"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+        <button class="row" id="toEcho" type="button"><span class="rt">Echo</span><span class="rv" id="echoStatus"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+        <button class="row" id="toMatch" type="button"><span class="rt">Matching</span><span class="rv" id="matchStatus"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+      </div>
+    </section>
+    <section class="sec" aria-labelledby="capLook">
+      <h3 class="cap" id="capLook">Appearance</h3>
+      <div class="group"><div class="row full"><div class="seg" id="themeSeg" role="radiogroup" aria-labelledby="capLook"></div></div></div>
+    </section>
+    <section class="sec" aria-labelledby="capDevice">
+      <h3 class="cap" id="capDevice">This device</h3>
+      <div class="group">
+        <button class="row" id="toData" type="button"><span class="rt">Backup and erase</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+        <button class="row" id="toAbout" type="button"><span class="rt">About</span><span class="rv">Light</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+      </div>
+    </section>
   </section>
 
-  <section class="sec" aria-labelledby="capToday">
-    <h2 class="cap" id="capToday">Today</h2>
-    <div class="group">
-      <div class="row col"><div class="tl-top"><span>Talk time <b id="todayTalk">0:00</b> of <span id="todayBudget">20:00</span></span><span id="todayLeft">20:00 left</span></div><div class="tlbar" id="budgetTrack" aria-hidden="true"><i id="budgetBar"></i></div></div>
-      <div class="row"><span class="rt" id="budgetLabel">Daily talk budget</span><div class="stp" role="group" aria-labelledby="budgetLabel"><button id="budgetDown" type="button" aria-label="Smaller budget">−</button><output id="budgetOut">20 min</output><button id="budgetUp" type="button" aria-label="Bigger budget">+</button></div></div>
-      <div class="row"><span class="rt">Days within budget</span><span class="rv" id="streak">0</span></div>
-    </div>
-    <div class="group week">
-      <div class="wk-head"><span>Talk time, last 7 days</span><span id="weekSel"></span></div>
-      <div class="wk-plot" id="weekPlot" data-nopress><div class="wk-budget" id="weekBudget"></div></div>
-      <div class="wk-days" id="weekDays" aria-hidden="true"></div>
-      <table class="sr" id="weekTable"></table>
-    </div>
-    <p class="foot">The line across the chart is your daily budget. Tap a day to see its talk time.</p>
-    <h2 class="cap" id="capHist">Past sessions</h2>
-    <div class="group" id="histList"></div>
-    <p class="foot">Light and Neural on this device share the budget and the past sessions.</p>
-  </section>
-
-  <section class="sec" aria-labelledby="capTimer">
-    <h2 class="cap" id="capTimer">Timer</h2>
-    <div class="group">
-      <div class="row full"><div class="seg" id="presets" role="radiogroup" aria-label="Session length"></div></div>
-      <div class="row"><span class="rt" id="minsLabel">Minutes</span><div class="stp" role="group" aria-labelledby="minsLabel"><button id="minsDown" type="button" aria-label="Fewer minutes">−</button><output id="minsOut">30</output><button id="minsUp" type="button" aria-label="More minutes">+</button></div></div>
-      <div class="row"><label class="rt" for="until">Until a time</label><button id="clearUntil" class="btn plain" type="button" hidden>Clear</button><input id="until" class="field" type="time"></div>
-    </div>
-  </section>
-
-  <section class="sec" aria-labelledby="capConv">
-    <h2 class="cap" id="capConv">Conversation</h2>
-    <div class="group">
-      <div class="row"><span class="rt" id="limitLabel">Talk before the echo</span><div class="stp" role="group" aria-labelledby="limitLabel"><button id="limitDown" type="button" aria-label="Less talk">−</button><output id="limitOut">15 s</output><button id="limitUp" type="button" aria-label="More talk">+</button></div></div>
-      <button class="row" id="swInterrupt" type="button" role="switch" aria-checked="true"><span class="rt">No interrupting</span><span class="sw" aria-hidden="true"></span></button>
-      <button class="row" id="swNudge" type="button" role="switch" aria-checked="true"><span class="rt">Nudge before the echo</span><span class="sw" aria-hidden="true"></span></button>
-    </div>
-    <p class="foot">For Conversation sessions. Each turn you can talk this long before the echo starts. A new turn begins when someone else speaks, or when you stay quiet for a second and a half.</p>
-    <p class="foot">No interrupting: talking over someone starts the echo at once. Nudge: a soft two-note tone in your headphones about 2½ seconds before the echo.</p>
-  </section>
-
-  <section class="sec" aria-labelledby="capTeach">
-    <h2 class="cap" id="capTeach">Teach Samt</h2>
-    <div class="group">
-      <div class="row gl" id="modelRow" hidden><svg class="ic"><use href="#i-chip"/></svg><span class="rt">Voice model</span><span class="rv" id="modelStatus">Loading</span></div>
-      <button class="row gl" id="teachVoice" type="button"><svg class="ic"><use href="#i-mic"/></svg><span class="rt" id="teachVoiceLabel">Your voice</span><span class="rv" id="voiceStatus">Not taught</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
-      <button class="row gl" id="teachOthers" type="button"><svg class="ic"><use href="#i-people"/></svg><span class="rt" id="teachOthersLabel">Other voices</span><span class="rv" id="othStatus">Recommended</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
-    </div>
-    <p class="foot">Your voice: read a short passage out loud, about 45 seconds, with the headphones and in the room you'll use. Add more any time, on other days and in other moods; Samt also keeps learning while you use it.</p>
-    <p class="foot">Other voices: let 30 seconds of other people talk while you stay quiet, such as the TV, a video, a call on speaker or someone in the room.</p>
-  </section>
-
-  <section class="sec" aria-labelledby="capPhr">
-    <h2 class="cap" id="capPhr">Phrases that pass</h2>
+  <!-- PHRASES (under Settings) -->
+  <section id="vPhrases" class="view" aria-labelledby="phTitle" hidden>
+    <div class="pagehead"><button class="back" type="button" data-back><svg class="ic" aria-hidden="true"><use href="#i-back"/></svg>Settings</button></div>
+    <h2 class="ptitle" id="phTitle">Phrases that pass</h2>
     <div id="phraseList" class="sec"></div>
     <div class="group">
       <button class="row act" id="recordAll" type="button">Record the missing phrases</button>
       <form id="addPhrase" class="row"><input id="newPhrase" class="field grow" type="text" maxlength="60" placeholder="Add your own phrase" aria-label="New phrase"><button class="btn plain" type="submit">Add</button></form>
     </div>
     <p class="foot">Say each phrase 3 times. When Samt hears one of them from you, it lets it through with no echo. Replies shorter than half a second already pass. <span id="phrStatus"></span></p>
-  </section>
-
-  <section class="sec" aria-labelledby="capEcho">
-    <h2 class="cap" id="capEcho">Echo</h2>
-    <div class="group">
-      <div class="row"><span class="rt" id="delayLabel">Delay</span><div class="stp" role="group" aria-labelledby="delayLabel"><button id="delayDown" type="button" aria-label="Shorter delay">−</button><output id="delayOut"></output><button id="delayUp" type="button" aria-label="Longer delay">+</button></div></div>
-      <div class="row"><span class="rt" id="volLabel">Volume</span><div class="stp" role="group" aria-labelledby="volLabel"><button id="volDown" type="button" aria-label="Quieter">−</button><output id="volOut"></output><button id="volUp" type="button" aria-label="Louder">+</button></div></div>
-    </div>
-    <p class="foot">About 200 ms disrupts speech the most. Bluetooth earbuds add their own delay, so lower it if talking still feels easy.</p>
-  </section>
-
-  <section class="sec" aria-labelledby="capVoice">
-    <h2 class="cap" id="capVoice">Matching your voice</h2>
-    <div class="group"><div class="row full"><div class="seg" id="strictSeg" role="radiogroup" aria-labelledby="capVoice"></div></div></div>
-    <h2 class="cap" id="capPhrM">Matching phrases</h2>
-    <div class="group"><div class="row full"><div class="seg" id="psensSeg" role="radiogroup" aria-labelledby="capPhrM"></div></div></div>
-    <p class="foot">Looser catches more of your talking and passes phrases more easily. Stricter ignores other people more.</p>
-  </section>
-
-  <section class="sec" aria-labelledby="capLook">
-    <h2 class="cap" id="capLook">Appearance</h2>
-    <div class="group"><div class="row full"><div class="seg" id="themeSeg" role="radiogroup" aria-labelledby="capLook"></div></div></div>
-  </section>
-
-  <section class="sec" aria-labelledby="capBackup">
-    <h2 class="cap" id="capBackup">Backup</h2>
-    <div class="group">
-      <button class="row act" id="backupBtn" type="button">Save a backup file</button>
-      <button class="row act" id="restoreBtn" type="button">Restore from a backup file</button>
-    </div>
-    <input id="restoreFile" type="file" accept="application/json,.json" hidden>
-    <p class="foot">Safari can clear a website's data if you don't open it for a week. Keep a backup file, or add Samt to your Home Screen (Share, then Add to Home Screen).</p>
-  </section>
-
-  <section class="sec">
-    <div class="group"><button class="row danger" id="resetAll" type="button">Erase Samt's setup on this device</button></div>
-    <p class="foot">Wear headphones, or the speaker feeds back into the mic. Keep Samt open and in front while it runs; iPadOS stops the mic in the background. Don't use it at the ramp or jetbridge, or while driving.</p>
-    <p class="foot">Your voice, the audio and your setup stay on this device, saved in this browser only. When you ask Claude for a summary, that session's numbers, your mood and your note are sent to Claude, and nothing else.</p>
-    <p class="foot" id="storeWarn" hidden>This browser won't keep Samt's setup (Private Browsing or blocked storage), so it will be lost when you close the page.</p>
-    
   </section>
 </main>
 
@@ -439,6 +481,7 @@ html.ql body.theme-dark .btn.strong.is-press { background-image: linear-gradient
   <div class="meter"><i id="recProg"></i></div>
   <p id="recHint" class="hint"></p>
   <div class="actions">
+    <button id="recResume" class="btn strong" type="button" hidden>Resume</button>
     <button id="recDone" class="btn strong" type="button">Done</button>
     <button id="recSkip" class="btn glass" type="button" hidden>Skip</button>
   </div>
@@ -455,6 +498,7 @@ html.ql body.theme-dark .btn.strong.is-press { background-image: linear-gradient
     <button id="cardSaveTyped" class="btn glass" type="button">Save as a card</button>
   </div>
   <p id="cardsHint" class="hint" hidden>Tap a card you made to delete it. The others stay.</p>
+  <p class="hint">Speak reads a card out loud through the iPad's speaker, so take your headphones off first or only you will hear it.</p>
 </div>
 
 <div id="remScrim" class="scrim" hidden></div>
@@ -473,6 +517,7 @@ html.ql body.theme-dark .btn.strong.is-press { background-image: linear-gradient
   <div class="seg" id="moodSeg" role="radiogroup" aria-labelledby="capMood"></div>
   <textarea id="endNote" class="field area" maxlength="300" placeholder="A note for yourself (optional)" aria-label="A note for yourself"></textarea>
   <button id="askClaude" class="btn glass" type="button">Ask Claude for a summary</button>
+  <div id="endTip" class="tip" hidden><p>Someone else talked this session. Teaching Samt what other voices sound like helps it tell them apart.</p><button id="endTeachOthers" class="btn plain" type="button">Teach other voices</button></div>
   <div id="endSummary" class="summary" hidden><b>Claude</b><p id="endSummaryText"></p></div>
   <p class="hint" id="claudeHint">Sends this session's numbers, your mood and your note to Claude. Your voice and the audio stay on this device.</p>
   <div class="actions"><button id="endDone" class="btn strong" type="button">Done</button><button id="endDelete" class="btn plain" type="button" hidden>Delete this session</button></div>
@@ -497,6 +542,113 @@ html.ql body.theme-dark .btn.strong.is-press { background-image: linear-gradient
   <div class="sheet-head"><h2 id="txtTitle"></h2><button id="txtClose" class="round" type="button" aria-label="Cancel"><svg class="ic"><use href="#i-close"/></svg></button></div>
   <form id="txtForm"><input id="txtField" class="field" style="width:100%" type="text" maxlength="80" autocomplete="off" aria-labelledby="txtTitle"></form>
   <div class="actions"><button id="txtSave" class="btn strong" type="button">Save</button></div>
+</div>
+
+<div id="timerScrim" class="scrim" hidden></div>
+<div id="timerPanel" class="sheet paged" role="dialog" aria-modal="true" aria-labelledby="timerTitle" hidden>
+  <div class="sheet-head"><h2 id="timerTitle">Session length</h2><button id="timerClose" class="round" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
+  <div class="group">
+    <div class="row full"><div class="seg" id="presets" role="radiogroup" aria-label="Session length"></div></div>
+    <div class="row"><span class="rt" id="minsLabel">Minutes</span><div class="stp" role="group" aria-labelledby="minsLabel"><button id="minsDown" type="button" aria-label="Fewer minutes">−</button><output id="minsOut">30</output><button id="minsUp" type="button" aria-label="More minutes">+</button></div></div>
+    <div class="row"><label class="rt" for="until">Until a time</label><button id="clearUntil" class="btn plain" type="button" hidden>Clear</button><input id="until" class="field" type="time"></div>
+  </div>
+  <div class="actions"><button id="timerDone" class="btn strong" type="button">Done</button></div>
+</div>
+
+<div id="convScrim" class="scrim" hidden></div>
+<div id="convPanel" class="sheet paged" role="dialog" aria-modal="true" aria-labelledby="convTitle" hidden>
+  <div class="sheet-head"><h2 id="convTitle">Conversation</h2><button id="convClose" class="round" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
+  <div class="group">
+    <div class="row"><span class="rt" id="limitLabel">Talk before the echo</span><div class="stp" role="group" aria-labelledby="limitLabel"><button id="limitDown" type="button" aria-label="Less talk">−</button><output id="limitOut">15 s</output><button id="limitUp" type="button" aria-label="More talk">+</button></div></div>
+    <button class="row" id="swInterrupt" type="button" role="switch" aria-checked="true"><span class="rt">No interrupting</span><span class="sw" aria-hidden="true"></span></button>
+    <button class="row" id="swNudge" type="button" role="switch" aria-checked="true"><span class="rt">Nudge before the echo</span><span class="sw" aria-hidden="true"></span></button>
+  </div>
+  <p class="hint">Each turn you can talk this long before the echo starts. A new turn begins when someone else speaks, or when you stay quiet for a second and a half. No interrupting: talking over someone starts the echo at once. Nudge: a soft two-note tone in your headphones about 2½ seconds before the echo.</p>
+  <div class="actions"><button id="convDone" class="btn strong" type="button">Done</button></div>
+</div>
+
+<div id="detailsScrim" class="scrim" hidden></div>
+<div id="detailsPanel" class="sheet paged" role="dialog" aria-modal="true" aria-labelledby="detailsTitle" hidden>
+  <div class="sheet-head"><h2 id="detailsTitle">This session</h2><button id="detailsClose" class="round" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
+  <div class="group">
+    <div class="row col"><div class="tl-top"><span>You <b id="tlMe">0%</b></span><span>Others <b id="tlOth">0%</b></span></div><div class="tlbar" aria-hidden="true"><i id="tlBar"></i></div></div>
+    <div class="row"><span class="rt">Talk time</span><span class="rv" id="cTalkTime">0:00</span></div>
+    <div class="row"><span class="rt">Times echoed</span><span class="rv" id="cTalk">0</span></div>
+    <div class="row"><span class="rt">Phrases passed</span><span class="rv" id="cPass">0</span></div>
+    <div class="row"><span class="rt">Short replies</span><span class="rv" id="cShort">0</span></div>
+    <div class="row"><span class="rt">Others ignored</span><span class="rv" id="cOther">0</span></div>
+    <div class="row"><span class="rt">Talked over someone</span><span class="rv" id="cInt">0</span></div>
+    <div class="row" id="nudgeRow" hidden><span class="rt">Nudges</span><span class="rv" id="cNudge">0</span></div>
+  </div>
+  <div id="last" class="group" hidden>
+    <div class="row"><span class="rt">Last</span><span class="rv wrap" id="lastText"></span></div>
+    <div class="row btns"><button id="wasMe" class="btn plain" type="button">That was me</button><button id="notMe" class="btn plain" type="button">Not me</button></div>
+  </div>
+  <div class="group"><div class="row"><span class="rt" id="dVolLabel">Echo volume</span><div class="stp" role="group" aria-labelledby="dVolLabel"><button id="dVolDown" type="button" aria-label="Quieter">−</button><output id="dVolOut"></output><button id="dVolUp" type="button" aria-label="Louder">+</button></div></div></div>
+  <p class="hint">You and Others: how much of the talking Samt heard was you.</p>
+</div>
+
+<div id="testScrim" class="scrim" hidden></div>
+<div id="testPanel" class="sheet" role="dialog" aria-modal="true" aria-labelledby="testTitle" hidden>
+  <div class="sheet-head"><h2 id="testTitle">Hear the echo</h2></div>
+  <p id="testText" class="passage"></p>
+  <div class="meter"><i id="testProg"></i></div>
+  <p id="testHint" class="hint"></p>
+  <div class="actions">
+    <button id="testStart" class="btn strong" type="button">Start</button>
+    <button id="testDone" class="btn strong" type="button" hidden>Done</button>
+    <button id="testMore" class="btn strong" type="button" hidden>Read a bit more</button>
+    <button id="testSkip" class="btn glass" type="button">Skip the test</button>
+  </div>
+</div>
+
+<div id="echoScrim" class="scrim" hidden></div>
+<div id="echoPanel" class="sheet paged" role="dialog" aria-modal="true" aria-labelledby="echoTitle" hidden>
+  <div class="sheet-head"><h2 id="echoTitle">Echo</h2><button id="echoClose" class="round" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
+  <div class="group">
+    <div class="row"><span class="rt" id="delayLabel">Delay</span><div class="stp" role="group" aria-labelledby="delayLabel"><button id="delayDown" type="button" aria-label="Shorter delay">−</button><output id="delayOut"></output><button id="delayUp" type="button" aria-label="Longer delay">+</button></div></div>
+    <div class="row"><span class="rt" id="volLabel">Volume</span><div class="stp" role="group" aria-labelledby="volLabel"><button id="volDown" type="button" aria-label="Quieter">−</button><output id="volOut"></output><button id="volUp" type="button" aria-label="Louder">+</button></div></div>
+  </div>
+  <p class="hint">About 200 ms disrupts speech the most. Bluetooth earbuds add their own delay, so lower it if talking still feels easy.</p>
+  <div class="actions"><button id="echoDone" class="btn strong" type="button">Done</button></div>
+</div>
+
+<div id="matchScrim" class="scrim" hidden></div>
+<div id="matchPanel" class="sheet paged" role="dialog" aria-modal="true" aria-labelledby="matchTitle" hidden>
+  <div class="sheet-head"><h2 id="matchTitle">Matching</h2><button id="matchClose" class="round" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
+  <h3 class="cap" id="capVoice">Your voice</h3>
+  <div class="group"><div class="row full"><div class="seg" id="strictSeg" role="radiogroup" aria-labelledby="capVoice"></div></div></div>
+  <h3 class="cap" id="capPhrM">Phrases</h3>
+  <div class="group"><div class="row full"><div class="seg" id="psensSeg" role="radiogroup" aria-labelledby="capPhrM"></div></div></div>
+  <p class="hint">Looser catches more of your talking and passes phrases more easily. Stricter ignores other people more.</p>
+  <div class="actions"><button id="matchDone" class="btn strong" type="button">Done</button></div>
+</div>
+
+<div id="dataScrim" class="scrim" hidden></div>
+<div id="dataPanel" class="sheet paged" role="dialog" aria-modal="true" aria-labelledby="dataTitle" hidden>
+  <div class="sheet-head"><h2 id="dataTitle">Backup and erase</h2><button id="dataClose" class="round" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
+  <div class="group">
+    <button class="row act" id="backupBtn" type="button">Save a backup file</button>
+    <button class="row act" id="restoreBtn" type="button">Restore from a backup file</button>
+    <button class="row danger" id="resetAll" type="button">Erase Samt's setup on this device</button>
+  </div>
+  <input id="restoreFile" type="file" accept="application/json,.json" hidden>
+  <p class="hint">Safari can clear a website's data if you don't open it for a week. Keep a backup file, or add Samt to your Home Screen (Share, then Add to Home Screen).</p>
+  <p class="hint" id="storeWarn" hidden>This browser won't keep Samt's setup (Private Browsing or blocked storage), so it will be lost when you close the page.</p>
+  <div class="actions"><button id="dataDone" class="btn strong" type="button">Done</button></div>
+</div>
+
+<div id="aboutScrim" class="scrim" hidden></div>
+<div id="aboutPanel" class="sheet paged" role="dialog" aria-modal="true" aria-labelledby="aboutTitle" hidden>
+  <div class="sheet-head"><h2 id="aboutTitle">About</h2><button id="aboutClose" class="round" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
+  <div class="group">
+    <div class="row gl" id="modelRow" hidden><svg class="ic"><use href="#i-chip"/></svg><span class="rt">Voice model</span><span class="rv" id="modelStatus">Loading</span></div>
+    <a class="row" href="../"><span class="rt">Light and Neural</span><span class="rv">Light</span><svg class="ic chev"><use href="#i-chev"/></svg></a>
+  </div>
+  <p class="hint">Wear headphones, or the speaker feeds back into the mic. Keep Samt open and in front while it runs; iPadOS stops the mic in the background. Don't use it at the ramp or jetbridge, or while driving.</p>
+  <p class="hint">Your voice, the audio and your setup stay on this device, saved in this browser only. When you ask Claude for a summary, that session's numbers, your mood and your note are sent to Claude, and nothing else.</p>
+  
+  <div class="actions"><button id="aboutDone" class="btn strong" type="button">Done</button></div>
 </div>
 
 <div id="actScrim" class="scrim" hidden></div>
@@ -1797,7 +1949,12 @@ registerProcessor('samt-tap', SamtTap);
     // interrupted (call, Siri, lock, app switch), muted, or ended: stop the echo at once and ask for a tap
     mic.setEcho(false);
     if (session && !session.paused) { session.paused = true; if (ctrl) ctrl.cut(); live('paused', 'Paused. Tap Resume.'); render(); }
+    else if (rec && (rec.kind === 'me' || rec.kind === 'oth')) {
+      // a call or Siri mid-reading: keep what was read, wait for Resume
+      if (!rec.paused) { rec.paused = true; $('recHint').textContent = 'Paused. What you read so far is kept. Tap Resume to keep going.'; $('recResume').hidden = false; }
+    }
     else if (rec) { rec.finish(true); note('The mic stopped. Try again.'); }
+    else if (echoTest) endEchoTest('stopped');
   }
   async function resumeAudio() {
     if (!session) return;
@@ -1905,7 +2062,7 @@ registerProcessor('samt-tap', SamtTap);
     const t = $('recTitle'); t.textContent = title; t.className = rtl ? 'ar' : ''; t.dir = rtl ? 'rtl' : 'auto';
     const p = $('recPassage'); p.hidden = !passage; p.textContent = passage || '';
     $('recHint').textContent = hint || ''; $('recProg').style.transform = 'scaleX(0)';
-    $('recDone').disabled = true; $('recSkip').hidden = !showSkip;
+    $('recDone').disabled = true; $('recSkip').hidden = !showSkip; $('recResume').hidden = true;
     if ($('recPanel').hidden) {
       $('recScrim').hidden = false; $('recPanel').hidden = false;
       requestAnimationFrame(() => requestAnimationFrame(() => { $('recScrim').classList.add('show'); $('recPanel').classList.add('show'); }));
@@ -1915,21 +2072,22 @@ registerProcessor('samt-tap', SamtTap);
     $('recScrim').classList.remove('show'); $('recPanel').classList.remove('show');
     setTimeout(() => { if (!rec) { $('recScrim').hidden = true; $('recPanel').hidden = true; } }, 520);
   }
-  function teachVoice(kind) {
+  function teachVoice(kind, opts) {
+    opts = opts || {};
     if (busy) return;
     if (MODE === 'neural' && !ortSession) { note('The voice model is still loading.'); return; }
     const started = ensureMic(); // first, inside the tap
     note(''); setBusy(kind === 'me' ? 'voice' : 'others');
     const target = kind === 'me' ? 45 : 30, min = kind === 'me' ? 20 : 10;
     openPanel(kind === 'me'
-      ? { title: voice && voice.ready ? 'Read this out loud again' : 'Read this out loud in your normal voice', passage: PASSAGE.join(' '), hint: 'Starting the mic' }
+      ? { title: voice && voice.ready && !opts.fresh ? 'Read this out loud again' : 'Read this out loud in your normal voice', passage: PASSAGE.join(' '), hint: 'Starting the mic' }
       : { title: 'Let other voices talk', passage: 'Play a video or podcast, put a call on speaker, or ask someone to talk near the iPad for about 30 seconds. Stay quiet yourself.', hint: 'Starting the mic' });
     rec = { kind };
     const finish = async (cancel) => {
       if (!rec || rec.kind !== kind) return; rec = null;
       const segs = teacher.end(); closePanel(); releaseMic();
       if (cancel || !segs.length) { setBusy(null); return; }
-      await learn(kind, segs);
+      await learn(kind, segs, opts);
     };
     rec.finish = finish;
     started.then(() => {
@@ -1948,20 +2106,26 @@ registerProcessor('samt-tap', SamtTap);
       });
     }, e => { rec = null; closePanel(); setBusy(null); note(micError(e)); });
   }
-  async function learn(kind, segs) {
+  async function learn(kind, segs, opts) {
+    opts = opts || {};
     setBusy('learning');
     live('busy', kind === 'me' ? 'Learning your voice' : 'Learning other voices');
     await tick();
     try {
       const f = segs.map(feats);
-      if (kind === 'me') profile.meSegs = capSegs(profile.meSegs.concat(f), 18000);
+      if (kind === 'me' && opts.fresh) { profile.meSegs = capSegs(f, 18000); profile.adaptSegs = []; }
+      else if (kind === 'me') profile.meSegs = capSegs(profile.meSegs.concat(f), 18000);
       else profile.othSegs = capSegs(profile.othSegs.concat(f), 9000);
       if (MODE === 'light') {
-        const v = voice || new S.LightVoice();
+        const v = opts.fresh || !voice ? new S.LightVoice() : voice;
         v.train(profile.meSegs.concat(profile.adaptSegs), profile.othSegs); voice = v;
       } else {
         const prog = p => live('busy', `${kind === 'me' ? 'Learning your voice' : 'Learning other voices'} ${Math.round(p * 100)}%`);
-        if (kind === 'me' && (!voice || !voice.ready)) { const v = new S.NeuralVoice(); v.attach(window.ort, ortSession); await v.train(segs, [], prog); voice = v; }
+        if (kind === 'me' && (opts.fresh || !voice || !voice.ready)) {
+          const v = new S.NeuralVoice(); v.attach(window.ort, ortSession); await v.train(segs, [], prog);
+          if (opts.fresh && voice && voice.N && voice.N.length) v.addNegativeEmbs(voice.N); // keep what it knows about other voices
+          voice = v;
+        }
         else if (kind === 'me') await voice.addPositive(segs, prog);
         else await voice.addNegative(segs, prog);
       }
@@ -1970,6 +2134,7 @@ registerProcessor('samt-tap', SamtTap);
       toast(kind === 'me' ? 'Learned your voice.' : 'Learned what other voices sound like.');
     } catch (e) { note(e.message || String(e)); }
     live('off', 'Ready'); setBusy(null);
+    if (kind === 'me' && wantEchoTest && voice && voice.ready) { wantEchoTest = false; openEchoTest(); } // setup's last step
   }
   function recordPhrases(ids) {
     if (busy || !ids.length) return;
@@ -2108,9 +2273,8 @@ registerProcessor('samt-tap', SamtTap);
       ctrl.start(mode === 'test' ? 'test' : 'silence');
       const now = Date.now();
       session = { mode, kind: settings.kind, startedAt: now, endAt: mode === 'test' ? null : now + plannedMs(), paused: false, bestQuiet: 0, recId: 's' + now.toString(36), savedAt: now, uiAt: 0, warned: 0, passing: false };
-      lastRec = null; renderLast(); renderCounts(); render();
+      lastRec = null; renderLast(); renderCounts(); enterSession(); render();
       if (mode !== 'test') showSessionReminder(); else $('remind').hidden = true;
-      $('quietLine').hidden = false;
       session.timer = setInterval(tickSession, 250); tickSession();
     }, e => { setBusy(null); releaseWake(); note(micError(e)); });
   }
@@ -2123,8 +2287,8 @@ registerProcessor('samt-tap', SamtTap);
   }
   function tickSession() {
     if (!session) return;
-    if (session.endAt) { const left = (session.endAt - Date.now()) / 1000; $('readout').textContent = fmt(left); if (left <= 0) { stopSession(true); return; } }
-    else $('readout').textContent = fmt((Date.now() - session.startedAt) / 1000);
+    if (session.endAt) { const left = (session.endAt - Date.now()) / 1000; $('sReadout').textContent = fmt(left); if (left <= 0) { stopSession(true); return; } }
+    else $('sReadout').textContent = fmt((Date.now() - session.startedAt) / 1000);
     if (!ctrl || session.paused) return;
     // the quiet timer: since your last words (or since the start)
     const g = ctrl.seg, talking = !!(g && g.speaker === 'me');
@@ -2155,7 +2319,7 @@ registerProcessor('samt-tap', SamtTap);
     if (ctrl) ctrl.stop();
     releaseMic(); if (!showCtx) releaseWake();
     const c = ctrl ? ctrl.counts : { talk: 0 };
-    $('quietLine').hidden = true; $('remind').hidden = true;
+    $('remind').hidden = true; leaveSession();
     refreshReadout(); setBusy(null);
     live(finished ? 'done' : 'off', finished ? `Done. You talked ${c.talk} time${c.talk === 1 ? '' : 's'}.` : 'Stopped');
     // keep the session (30 seconds or longer) and open its summary
@@ -2209,6 +2373,9 @@ registerProcessor('samt-tap', SamtTap);
     $('budgetBar').style.width = Math.min(100, 100 * talk / bud).toFixed(1) + '%'; $('budgetTrack').classList.toggle('over', over);
     $('budgetOut').textContent = shared.budget + ' min';
     const n = streakDays(m); $('streak').textContent = n === 1 ? '1 day' : `${n} days`;
+    const tl = $('todayLine'), b = document.createElement('b'); b.textContent = clock(talk); tl.textContent = ''; tl.classList.toggle('over', over);
+    tl.append('Today: ', b, over ? ` talk, over the ${clock(bud)} budget` : ` of ${clock(bud)} talk`);
+    $('progressStatus').textContent = n ? (n === 1 ? '1 day in budget' : `${n} days in budget`) : '';
     renderWeek(m, quick);
   }
   function renderWeek(m, quick) {
@@ -2292,6 +2459,7 @@ registerProcessor('samt-tap', SamtTap);
     showSummary(rec.summary);
     $('askClaude').disabled = false; $('askClaude').textContent = rec.summary ? 'Ask Claude again' : 'Ask Claude for a summary';
     $('claudeHint').textContent = CLAUDE_HINT; $('endDelete').hidden = !review;
+    $('endTip').hidden = !!review || !(rec.others > 0) || !!profile.othSegs.length || !!(voice && voice.N && voice.N.length);
     openSheet('end');
   }
   function showSummary(t) { $('endSummary').hidden = !t; $('endSummaryText').textContent = t || ''; }
@@ -2385,11 +2553,18 @@ registerProcessor('samt-tap', SamtTap);
   /* ---------- reminders: Qur'an (Tanzil Uthmani) and hadith (sunnah.com), the meaning on a tap ---------- */
   const REM = window.SAMT_REMINDERS || { verses: [], hadith: [] };
   const remItems = () => (REM.verses || []).map(v => Object.assign({ kind: 'verse' }, v)).concat((REM.hadith || []).map(h => Object.assign({ kind: 'hadith' }, h)));
+  /* ﷺ (ṣallā llāhu ʿalayhi wa-sallam, "God bless him and give him peace") is one compact Amiri glyph that blurs at text
+     size, so it gets its own larger span. */
+  function setSaw(el, text) {
+    el.textContent = '';
+    text.split('ﷺ').forEach((part, i) => { if (i) { const s = document.createElement('span'); s.className = 'saw'; s.lang = 'ar'; s.textContent = 'ﷺ'; el.append(s); } if (part) el.append(part); });
+    return el;
+  }
   function fillRem(box, it, full) {
     box.textContent = '';
     const add = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; box.appendChild(e); return e; };
-    if (it.kind === 'hadith') add('p', 'ref', 'The Prophet ﷺ said');
-    const ar = add('p', 'ar', it.text); ar.lang = 'ar'; ar.dir = 'rtl';
+    if (it.kind === 'hadith') setSaw(add('p', 'ref'), 'The Prophet ﷺ said');
+    const ar = add('p', it.kind === 'verse' ? 'ar quran' : 'ar', it.text); ar.lang = 'ar'; ar.dir = 'rtl';
     const ref = add('p', 'ref');
     if (it.kind === 'verse') { const n = document.createElement('span'); n.className = 'arn'; n.lang = 'ar'; n.dir = 'rtl'; n.textContent = it.surah; ref.append(n, ' ' + it.ref); }
     else ref.textContent = it.ref + (it.grade ? ' · ' + it.grade : '');
@@ -2406,7 +2581,7 @@ registerProcessor('samt-tap', SamtTap);
     const items = remItems();
     for (const [cap, kind] of [["Qur'an", 'verse'], ['Hadith (sayings of the Prophet ﷺ)', 'hadith']]) {
       const list = items.filter(x => x.kind === kind); if (!list.length) continue;
-      const h = document.createElement('h3'); h.className = 'cap'; h.textContent = cap; box.appendChild(h);
+      const h = document.createElement('h3'); h.className = 'cap'; setSaw(h, cap); box.appendChild(h);
       for (const it of list) { const g = document.createElement('div'); g.className = 'group'; const r = document.createElement('div'); r.className = 'rem'; fillRem(r, it, true); g.appendChild(r); box.appendChild(g); }
     }
     $('remSource').textContent = REM.sources || '';
@@ -2418,6 +2593,125 @@ registerProcessor('samt-tap', SamtTap);
     const i = (+shared.remindAt || 0) % items.length; shared.remindAt = (i + 1) % items.length; saveShared();
     fillRem(box, items[i], false); box.hidden = false;
   }
+
+  /* ---------- views: Home, the session, and the pages under Home (Back, and the iPad's back gesture) ---------- */
+  const VIEWS = { home: 'vHome', session: 'vSession', progress: 'vProgress', settings: 'vSettings', phrases: 'vPhrases' };
+  let view = 'home';
+  function goView(v, how) {
+    if (!VIEWS[v]) v = 'home';
+    for (const k of Object.keys(VIEWS)) $(VIEWS[k]).hidden = k !== v;
+    const changed = v !== view; view = v; document.body.dataset.view = v;
+    try { if (how === 'push') window.history.pushState({ samt: v }, ''); else if (how === 'replace') window.history.replaceState({ samt: v }, ''); } catch (e) {}
+    if (!changed) return;
+    window.scrollTo(0, 0);
+    if (v === 'progress') { renderToday(); renderHistory(); }
+    const h = $(VIEWS[v]).querySelector('.ptitle'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
+  }
+  window.addEventListener('popstate', e => {
+    if (session) { try { window.history.pushState({ samt: 'session' }, ''); } catch (err) {} return; } // a running session stays on screen
+    const v = e.state && e.state.samt; goView(v && v !== 'session' ? v : 'home', 'none');
+  });
+  function goBack() {
+    const st = window.history.state;
+    if (st && st.samt && st.samt !== 'home' && window.history.length > 1) window.history.back();
+    else goView(view === 'phrases' ? 'settings' : 'home', 'replace');
+  }
+  function enterSession() {
+    document.body.classList.add('in-session');
+    $('sKind').textContent = session.mode === 'test' ? 'Test, no echo' : session.kind === 'conversation' ? 'Conversation' : 'Silence';
+    goView('session', 'push'); // its own history entry, so a Back swipe lands on the popstate guard instead of leaving Samt
+  }
+  function leaveSession() {
+    document.body.classList.remove('in-session');
+    if (openSheets.includes('details')) closeSheet('details');
+    const ours = window.history.state && window.history.state.samt === 'session';
+    goView('home', 'none');
+    if (ours) try { window.history.back(); } catch (e) {} // drop the session's entry; the popstate lands on Home again
+  }
+  const LEVEL = { '-1': 'Looser', 0: 'Balanced', 1: 'Stricter' };
+  function settingsValues() {
+    $('echoStatus').textContent = `${settings.delay} ms · ${settings.vol}%`;
+    $('matchStatus').textContent = settings.strict === settings.psens ? LEVEL[settings.strict] : `${LEVEL[settings.strict]}, phrases ${LEVEL[settings.psens].toLowerCase()}`;
+  }
+  const convText = () => `${settings.limit} s turns · ${settings.noInterrupt ? 'no interrupting' : 'interrupting allowed'} · ${settings.nudge ? 'nudge first' : 'no nudge'}`;
+  /* The first time Conversation is picked, offer the phrases (once). */
+  function maybeOfferPhrases() {
+    const key = 'samt.' + MODE + '.phraseOffer';
+    try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch (e) { return; }
+    if (!voice || !voice.ready || book.phrases.some(p => p.takes.length >= 2)) return;
+    ask({ title: 'Let greetings pass?', msg: 'Say salam, thanks and short answers 3 times each, about 2 minutes, and Samt lets them through with no echo.',
+      actions: [{ label: 'Record the phrases', run: () => recordPhrases(book.phrases.filter(p => p.takes.length < 2).map(p => p.id)) }, { label: 'Not now', run: () => {} }] });
+  }
+  /* Ending a real session takes a 2-second hold while a ring fills, so it can't happen by accident or on impulse. A test stops with a tap. */
+  function wireHoldStop() {
+    const b = $('stop'); let t = 0;
+    const cancel = tell => { if (!t) return; clearTimeout(t); t = 0; b.classList.remove('holding'); if (tell) toast('Hold Stop for 2 seconds to end the session.'); };
+    const begin = () => {
+      if (!session) return;
+      if (session.mode === 'test') { stopSession(false); return; }
+      if (t) return;
+      b.classList.add('holding');
+      t = setTimeout(() => { t = 0; b.classList.remove('holding'); stopSession(false); }, 2000);
+    };
+    b.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' || e.button === 0) begin(); });
+    b.addEventListener('pointerup', () => cancel(true));
+    b.addEventListener('pointerleave', () => cancel(false));
+    b.addEventListener('pointercancel', () => cancel(false));
+    b.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) { e.preventDefault(); begin(); } });
+    b.addEventListener('keyup', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cancel(true); } });
+    b.addEventListener('contextmenu', e => e.preventDefault());
+  }
+
+  /* ---------- setup's last step: ten seconds of the real echo, to hear it once and check that Samt knows the voice ---------- */
+  let wantEchoTest = false, echoTest = null;
+  function openEchoTest() {
+    if (busy || !voice || !voice.ready) return;
+    $('testText').textContent = 'Tap Start, then say anything for a few seconds, like counting to ten. You should hear yourself a moment late in your headphones.';
+    $('testHint').textContent = ''; $('testProg').style.transform = 'scaleX(0)';
+    $('testStart').hidden = false; $('testStart').textContent = 'Start'; $('testDone').hidden = true; $('testMore').hidden = true;
+    $('testSkip').hidden = false; $('testSkip').textContent = 'Skip the test';
+    openSheet('test');
+  }
+  function startEchoTest() {
+    if (echoTest || busy) return;
+    const started = ensureMic(); // inside the tap
+    $('testStart').hidden = true; $('testHint').textContent = 'Starting the mic'; setBusy('echotest');
+    started.then(() => {
+      listener.reset(); voice.strict = strictValue(); book.sens = phraseSens();
+      const t = { me: 0, speech: 0, echo: false, start: listener.fs.nFrames };
+      t.ctrl = new Controller({ listener, voice, book, onEcho: setEcho, onEvent: e => {
+        if (e.type === 'segment') { t.speech++; if (e.rec.speaker === 'me') t.me++; }
+        else if (e.type === 'verdict' && e.isMe) t.me++;
+        else if (e.type === 'state' && e.state === 'echo') t.echo = true;
+      } });
+      t.ctrl.start('silence');
+      t.timer = setInterval(() => {
+        const sec = (listener.fs.nFrames - t.start) / 100;
+        $('testProg').style.transform = `scaleX(${Math.min(1, sec / 10).toFixed(3)})`;
+        $('testHint').textContent = t.echo ? 'That was you. Keep talking to hear the echo.' : `Listening, ${Math.max(0, Math.ceil(10 - sec))} s`;
+        if (sec >= 10) endEchoTest('done');
+      }, 200);
+      echoTest = t;
+    }, e => { setBusy(null); $('testStart').hidden = false; $('testHint').textContent = micError(e); });
+  }
+  function endEchoTest(why) {
+    const t = echoTest; echoTest = null;
+    if (t) { clearInterval(t.timer); try { t.ctrl.stop(); } catch (e) {} releaseMic(); setBusy(null); }
+    if (why === 'skip' || why === 'close') { closeSheet('test'); return; }
+    $('testHint').textContent = '';
+    if (why === 'stopped') { $('testHint').textContent = 'The mic stopped.'; $('testStart').hidden = false; $('testStart').textContent = 'Try again'; return; }
+    if (t && (t.me > 0 || t.echo)) {
+      $('testText').textContent = "Samt knows your voice and turned the echo on. You're set.";
+      $('testDone').hidden = false; $('testSkip').hidden = true;
+    } else if (t && t.speech > 0) {
+      $('testText').textContent = "Samt heard talking but didn't recognise it as you yet. Reading a little more usually fixes it.";
+      $('testMore').hidden = false; $('testSkip').textContent = 'Continue anyway';
+    } else {
+      $('testText').textContent = "Samt didn't hear any talking. Check that your headphones' mic is on, then try again.";
+      $('testStart').hidden = false; $('testStart').textContent = 'Try again'; $('testSkip').textContent = 'Continue anyway';
+    }
+  }
+  closers.test = () => endEchoTest('close');
 
   /* ---------- rendering ---------- */
   function setBusy(b) { busy = b; render(); }
@@ -2432,14 +2726,22 @@ registerProcessor('samt-tap', SamtTap);
     $('phrStatus').textContent = `${ready} of ${book.phrases.length} recorded.`;
     $('teachVoice').disabled = !idle || !modelOk; $('teachOthers').disabled = !idle || !taught || !modelOk;
     $('recordAll').disabled = !idle; $('resetAll').disabled = !idle; $('restoreBtn').disabled = !idle; $('backupBtn').disabled = !idle || !taught;
-    const inS = busy === 'silence', inT = busy === 'test', paused = !!(session && session.paused);
-    $('go').disabled = !(idle || inS || (inT && paused)) || !taught || !modelOk;
-    $('test').disabled = !(idle || inT) || !taught || !modelOk;
-    $('go').textContent = paused ? 'Resume' : inS ? 'Stop' : settings.kind === 'conversation' ? 'Start conversation' : 'Start silence';
-    $('test').textContent = inT ? 'Stop test' : 'Test without echo';
-    $('test').hidden = inS; $('pass').hidden = !inS || paused;
+    const paused = !!(session && session.paused), test = !!(session && session.mode === 'test');
+    // Home: teach your voice first, or start a session
+    $('setupCard').hidden = taught; $('readyCard').hidden = !taught;
+    $('setupStart').disabled = !idle || !modelOk;
+    $('setupModel').hidden = modelOk; if (!modelOk) $('setupModel').textContent = 'Getting the voice model ready: ' + $('modelStatus').textContent.toLowerCase();
+    $('go').disabled = $('test').disabled = !idle || !taught || !modelOk;
+    $('go').textContent = settings.kind === 'conversation' ? 'Start conversation' : 'Start silence';
     $('kindSeg').querySelectorAll('button').forEach(b => { b.disabled = !idle; });
-    if (idle && $('live').dataset.state === 'off') live('off', !modelOk ? 'Loading the voice model' : taught ? 'Ready' : 'Teach Samt your voice to begin');
+    settingsValues();
+    $('convLine').hidden = settings.kind !== 'conversation'; $('convLine').textContent = convText(); $('convStatus').textContent = `${settings.limit} s turns`;
+    $('toProgress').hidden = !history.length;
+    $('phrCount').textContent = `${book.phrases.filter(p => p.takes.length >= 2).length} of ${book.phrases.length}`;
+    $('endTeachOthers').disabled = !idle;
+    // the session view
+    $('resume').hidden = !paused; $('pass').hidden = paused || test;
+    $('stopText').textContent = test ? 'Stop test' : 'Hold to stop'; $('stop').classList.toggle('hold', !test); $('stop').querySelector('.ring').style.display = test ? 'none' : '';
     renderPhrases();
   }
   function renderPhrases() {
@@ -2471,9 +2773,44 @@ registerProcessor('samt-tap', SamtTap);
 
   /* ---------- wiring ---------- */
   function wire() {
-    $('go').onclick = () => { if (session && session.paused) resumeAudio(); else if (busy === 'silence') stopSession(false); else startSession('silence'); };
-    $('test').onclick = () => busy === 'test' ? stopSession(false) : startSession('test');
-    $('teachVoice').onclick = () => teachVoice('me');
+    $('go').onclick = () => startSession('silence');
+    $('test').onclick = () => startSession('test');
+    $('resume').onclick = resumeAudio;
+    wireHoldStop();
+    $('setupStart').onclick = () => { wantEchoTest = true; teachVoice('me'); };
+    $('teachVoice').onclick = () => {
+      if (!voice || !voice.ready) { wantEchoTest = true; teachVoice('me'); return; }
+      ask({ title: 'Your voice', msg: `Samt knows ${Math.round(frames(profile.meSegs) / 100)} seconds of your voice. If you start over, the old voice keeps working until the new one is saved.`,
+        actions: [{ label: 'Add more of your voice', run: () => teachVoice('me') }, { label: 'Start over', run: () => { wantEchoTest = true; teachVoice('me', { fresh: true }); } }, { label: 'Hear the echo test', run: openEchoTest }] });
+    };
+    $('recResume').onclick = async () => {
+      if (!rec || !rec.paused) return;
+      mic.prime(); // inside the tap
+      try {
+        if (!mic.trackLive()) { mic.stop(); await ensureMic(); }
+        else if (!(await mic.resume())) throw Object.assign(new Error('x'), { name: 'AudioNotRunning' });
+        listener.reset(); rec.paused = false; $('recResume').hidden = true; $('recHint').textContent = 'Listening again.';
+      } catch (e) { note(micError(e)); }
+    };
+    // pages, sheets and the session's own tools
+    $('toProgress').onclick = () => goView('progress', 'push');
+    $('toSettings').onclick = () => goView('settings', 'push');
+    $('toPhrases').onclick = () => goView('phrases', 'push');
+    document.addEventListener('click', e => { if (e.target.closest('[data-back]')) { e.preventDefault(); goBack(); } });
+    $('readout').onclick = () => openSheet('timer');
+    $('timerClose').onclick = $('timerDone').onclick = () => closeSheet('timer');
+    $('convLine').onclick = $('toConv').onclick = () => openSheet('conv');
+    $('convClose').onclick = $('convDone').onclick = () => closeSheet('conv');
+    for (const k of ['echo', 'match', 'data', 'about']) { $('to' + k[0].toUpperCase() + k.slice(1)).onclick = () => openSheet(k); $(k + 'Close').onclick = $(k + 'Done').onclick = () => closeSheet(k); }
+    $('detailsBtn').onclick = () => { renderCounts(); renderLast(); openSheet('details'); };
+    $('detailsClose').onclick = () => closeSheet('details');
+    $('sCard').onclick = () => $('openCards').click();
+    $('sSign').onclick = () => $('openSign').click();
+    $('testStart').onclick = startEchoTest;
+    $('testDone').onclick = () => closeSheet('test');
+    $('testSkip').onclick = () => endEchoTest('skip');
+    $('testMore').onclick = () => { closeSheet('test'); wantEchoTest = true; teachVoice('me'); };
+    $('endTeachOthers').onclick = () => { closeEnd(); teachVoice('oth'); };
     $('teachOthers').onclick = () => teachVoice('oth');
     $('recordAll').onclick = () => { const ids = book.phrases.filter(p => p.takes.length < 2).map(p => p.id); recordPhrases(ids.length ? ids : book.phrases.map(p => p.id)); };
     $('recDone').onclick = () => rec && rec.finish(false);
@@ -2490,9 +2827,9 @@ registerProcessor('samt-tap', SamtTap);
       else if (rec) rec.finish(true);
     });
     // the kind of session, talking freely, and the conversation rules
-    seg($('kindSeg'), [{ v: 'silence', label: 'Silence' }, { v: 'conversation', label: 'Conversation' }], settings.kind, v => { settings.kind = v; saveSettings(); render(); renderCounts(); });
+    seg($('kindSeg'), [{ v: 'silence', label: 'Silence' }, { v: 'conversation', label: 'Conversation' }], settings.kind, v => { settings.kind = v; saveSettings(); render(); renderCounts(); if (v === 'conversation') maybeOfferPhrases(); });
     $('pass').onclick = () => { if (!ctrl || !session || session.mode === 'test' || session.paused) return; ctrl.pass(Math.min(60, ctrl.passLeft() + 10)); tickSession(); };
-    const applyConv = () => { if (ctrl && session && session.kind === 'conversation') Object.assign(ctrl.p, convParams()); };
+    const applyConv = () => { if (ctrl && session && session.kind === 'conversation') Object.assign(ctrl.p, convParams()); render(); };
     const sw = (id, key) => { const el = $(id), sync = () => el.setAttribute('aria-checked', String(!!settings[key])); el.onclick = () => { settings[key] = !settings[key]; saveSettings(); sync(); applyConv(); }; sync(); };
     sw('swInterrupt', 'noInterrupt'); sw('swNudge', 'nudge');
     // the daily budget
@@ -2518,7 +2855,7 @@ registerProcessor('samt-tap', SamtTap);
     $('showWords').onclick = changeSignWords;
     $('openRemind').onclick = () => { renderRemList(); openSheet('rem'); };
     $('remClose').onclick = () => closeSheet('rem');
-    $('swRemind').onclick = () => { shared.remind = !shared.remind; saveShared(); $('swRemind').setAttribute('aria-checked', String(shared.remind)); $('remindStatus').textContent = shared.remind ? 'On' : 'Off'; };
+    $('swRemind').onclick = () => { shared.remind = !shared.remind; saveShared(); $('swRemind').setAttribute('aria-checked', String(shared.remind)); };
     // a session's end
     moodCtl = seg($('moodSeg'), [{ v: 'easy', label: 'Easy' }, { v: 'okay', label: 'Okay' }, { v: 'hard', label: 'Hard' }], null, v => { endMood = v; });
     $('endDone').onclick = closeEnd; $('endClose').onclick = closeEnd; $('askClaude').onclick = askClaude;
@@ -2541,12 +2878,14 @@ registerProcessor('samt-tap', SamtTap);
       $(up).onclick = () => { settings[key] = Math.min(hi, settings[key] + step); saveSettings(); show(); apply(); };
       show();
     };
-    stepper('delay', 'delayDown', 'delayUp', 'delayOut', 20, 60, 400, v => v + ' ms', () => mic.setDelay(settings.delay / 1000));
-    stepper('vol', 'volDown', 'volUp', 'volOut', 10, 10, 100, v => v + '%', () => mic.setVolume(settings.vol / 100));
-    stepper('limit', 'limitDown', 'limitUp', 'limitOut', 5, 5, 60, v => v + ' s', () => { if (ctrl && session && session.kind === 'conversation') Object.assign(ctrl.p, convParams()); });
+    stepper('delay', 'delayDown', 'delayUp', 'delayOut', 20, 60, 400, v => v + ' ms', () => { mic.setDelay(settings.delay / 1000); settingsValues(); });
+    const volApply = () => { mic.setVolume(settings.vol / 100); $('volOut').textContent = $('dVolOut').textContent = settings.vol + '%'; settingsValues(); };
+    stepper('vol', 'volDown', 'volUp', 'volOut', 10, 10, 100, v => v + '%', volApply);
+    stepper('vol', 'dVolDown', 'dVolUp', 'dVolOut', 10, 10, 100, v => v + '%', volApply); // the same volume, inside a session
+    stepper('limit', 'limitDown', 'limitUp', 'limitOut', 5, 5, 60, v => v + ' s', () => { if (ctrl && session && session.kind === 'conversation') Object.assign(ctrl.p, convParams()); render(); });
     const LSB = [{ v: -1, label: 'Looser' }, { v: 0, label: 'Balanced' }, { v: 1, label: 'Stricter' }];
-    seg($('strictSeg'), LSB, settings.strict, v => { settings.strict = v; saveSettings(); if (voice) voice.strict = strictValue(); });
-    seg($('psensSeg'), LSB, settings.psens, v => { settings.psens = v; saveSettings(); book.sens = phraseSens(); });
+    seg($('strictSeg'), LSB, settings.strict, v => { settings.strict = v; saveSettings(); if (voice) voice.strict = strictValue(); settingsValues(); });
+    seg($('psensSeg'), LSB, settings.psens, v => { settings.psens = v; saveSettings(); book.sens = phraseSens(); settingsValues(); });
     seg($('themeSeg'), [{ v: 'auto', label: 'Auto' }, { v: 'day', label: 'Day' }, { v: 'night', label: 'Night' }], themePref(), v => { try { localStorage.setItem('samt.theme', v); } catch (e) {} applyTheme(); });
     $('backupBtn').onclick = backup;
     $('restoreBtn').onclick = () => $('restoreFile').click();
@@ -2568,12 +2907,15 @@ registerProcessor('samt-tap', SamtTap);
     await loadAll();
     if (!(await store.available())) $('storeWarn').hidden = false;
     live('off', 'Ready'); render(); renderCounts();
-    $('remindStatus').textContent = shared.remind ? 'On' : 'Off';
+    try { window.history.replaceState({ samt: 'home' }, ''); } catch (e) {}
+    goView('home', 'none');
     try { await loadHistory(); } catch (e) {}
-    renderHistory(); renderToday();
+    renderHistory(); renderToday(); render();
     setInterval(() => { if (!session) renderToday(true); }, 60000); // a new day starts at midnight
     document.addEventListener('visibilitychange', async () => { if (document.visibilityState === 'visible' && !session) { try { await loadHistory(); } catch (e) {} renderHistory(); renderToday(); } });
-    debug.history = () => history; debug.shared = shared;
+    // fetch the Amiri fonts once the page has settled, so a session's first reminder doesn't flash in another font
+    setTimeout(() => { try { for (const f of ['"Amiri Quran"', 'Amiri', '"Samt Arabic"']) document.fonts.load('26px ' + f, 'ق').catch(() => {}); } catch (e) {} }, 2000);
+    debug.history = () => history; debug.shared = shared; debug.view = () => view; debug.trouble = onTrouble;
     if (FAKE) { debug.feed = async (name, url) => { const b = await (await fetch(url)).arrayBuffer(); return mic.play(name, new Float32Array(b)); }; debug.ensureEngine = ensureMic; }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();

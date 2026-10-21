@@ -1,4 +1,5 @@
-# Samt: a static site with no build step. Netlify publishes the prebuilt site/ folder on every push to main.
+# Samt: a static site with no build step. Netlify publishes the prebuilt site/ folder as it is (each release is
+# uploaded with Netlify's deploy tool; the project isn't linked to Git builds, see README.md).
 # To change the pages, edit src/ and run `python3 scripts/build.py`, then commit site/ with it.
 [build]
   publish = "site"
@@ -14,6 +15,12 @@
   [headers.values]
     Cache-Control = "public, max-age=604800"
     Content-Type = "application/octet-stream"
+
+# The two Amiri fonts (150 KB) change rarely too.
+[[headers]]
+  for = "/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
 
 [[headers]]
   for = "/*/manifest.webmanifest"

@@ -189,7 +189,12 @@
     // interrupted (call, Siri, lock, app switch), muted, or ended: stop the echo at once and ask for a tap
     mic.setEcho(false);
     if (session && !session.paused) { session.paused = true; if (ctrl) ctrl.cut(); live('paused', 'Paused. Tap Resume.'); render(); }
+    else if (rec && (rec.kind === 'me' || rec.kind === 'oth')) {
+      // a call or Siri mid-reading: keep what was read, wait for Resume
+      if (!rec.paused) { rec.paused = true; $('recHint').textContent = 'Paused. What you read so far is kept. Tap Resume to keep going.'; $('recResume').hidden = false; }
+    }
     else if (rec) { rec.finish(true); note('The mic stopped. Try again.'); }
+    else if (echoTest) endEchoTest('stopped');
   }
   async function resumeAudio() {
     if (!session) return;
@@ -297,7 +302,7 @@
     const t = $('recTitle'); t.textContent = title; t.className = rtl ? 'ar' : ''; t.dir = rtl ? 'rtl' : 'auto';
     const p = $('recPassage'); p.hidden = !passage; p.textContent = passage || '';
     $('recHint').textContent = hint || ''; $('recProg').style.transform = 'scaleX(0)';
-    $('recDone').disabled = true; $('recSkip').hidden = !showSkip;
+    $('recDone').disabled = true; $('recSkip').hidden = !showSkip; $('recResume').hidden = true;
     if ($('recPanel').hidden) {
       $('recScrim').hidden = false; $('recPanel').hidden = false;
       requestAnimationFrame(() => requestAnimationFrame(() => { $('recScrim').classList.add('show'); $('recPanel').classList.add('show'); }));
@@ -307,21 +312,22 @@
     $('recScrim').classList.remove('show'); $('recPanel').classList.remove('show');
     setTimeout(() => { if (!rec) { $('recScrim').hidden = true; $('recPanel').hidden = true; } }, 520);
   }
-  function teachVoice(kind) {
+  function teachVoice(kind, opts) {
+    opts = opts || {};
     if (busy) return;
     if (MODE === 'neural' && !ortSession) { note('The voice model is still loading.'); return; }
     const started = ensureMic(); // first, inside the tap
     note(''); setBusy(kind === 'me' ? 'voice' : 'others');
     const target = kind === 'me' ? 45 : 30, min = kind === 'me' ? 20 : 10;
     openPanel(kind === 'me'
-      ? { title: voice && voice.ready ? 'Read this out loud again' : 'Read this out loud in your normal voice', passage: PASSAGE.join(' '), hint: 'Starting the mic' }
+      ? { title: voice && voice.ready && !opts.fresh ? 'Read this out loud again' : 'Read this out loud in your normal voice', passage: PASSAGE.join(' '), hint: 'Starting the mic' }
       : { title: 'Let other voices talk', passage: 'Play a video or podcast, put a call on speaker, or ask someone to talk near the iPad for about 30 seconds. Stay quiet yourself.', hint: 'Starting the mic' });
     rec = { kind };
     const finish = async (cancel) => {
       if (!rec || rec.kind !== kind) return; rec = null;
       const segs = teacher.end(); closePanel(); releaseMic();
       if (cancel || !segs.length) { setBusy(null); return; }
-      await learn(kind, segs);
+      await learn(kind, segs, opts);
     };
     rec.finish = finish;
     started.then(() => {
@@ -340,20 +346,26 @@
       });
     }, e => { rec = null; closePanel(); setBusy(null); note(micError(e)); });
   }
-  async function learn(kind, segs) {
+  async function learn(kind, segs, opts) {
+    opts = opts || {};
     setBusy('learning');
     live('busy', kind === 'me' ? 'Learning your voice' : 'Learning other voices');
     await tick();
     try {
       const f = segs.map(feats);
-      if (kind === 'me') profile.meSegs = capSegs(profile.meSegs.concat(f), 18000);
+      if (kind === 'me' && opts.fresh) { profile.meSegs = capSegs(f, 18000); profile.adaptSegs = []; }
+      else if (kind === 'me') profile.meSegs = capSegs(profile.meSegs.concat(f), 18000);
       else profile.othSegs = capSegs(profile.othSegs.concat(f), 9000);
       if (MODE === 'light') {
-        const v = voice || new S.LightVoice();
+        const v = opts.fresh || !voice ? new S.LightVoice() : voice;
         v.train(profile.meSegs.concat(profile.adaptSegs), profile.othSegs); voice = v;
       } else {
         const prog = p => live('busy', `${kind === 'me' ? 'Learning your voice' : 'Learning other voices'} ${Math.round(p * 100)}%`);
-        if (kind === 'me' && (!voice || !voice.ready)) { const v = new S.NeuralVoice(); v.attach(window.ort, ortSession); await v.train(segs, [], prog); voice = v; }
+        if (kind === 'me' && (opts.fresh || !voice || !voice.ready)) {
+          const v = new S.NeuralVoice(); v.attach(window.ort, ortSession); await v.train(segs, [], prog);
+          if (opts.fresh && voice && voice.N && voice.N.length) v.addNegativeEmbs(voice.N); // keep what it knows about other voices
+          voice = v;
+        }
         else if (kind === 'me') await voice.addPositive(segs, prog);
         else await voice.addNegative(segs, prog);
       }
@@ -362,6 +374,7 @@
       toast(kind === 'me' ? 'Learned your voice.' : 'Learned what other voices sound like.');
     } catch (e) { note(e.message || String(e)); }
     live('off', 'Ready'); setBusy(null);
+    if (kind === 'me' && wantEchoTest && voice && voice.ready) { wantEchoTest = false; openEchoTest(); } // setup's last step
   }
   function recordPhrases(ids) {
     if (busy || !ids.length) return;
@@ -500,9 +513,8 @@
       ctrl.start(mode === 'test' ? 'test' : 'silence');
       const now = Date.now();
       session = { mode, kind: settings.kind, startedAt: now, endAt: mode === 'test' ? null : now + plannedMs(), paused: false, bestQuiet: 0, recId: 's' + now.toString(36), savedAt: now, uiAt: 0, warned: 0, passing: false };
-      lastRec = null; renderLast(); renderCounts(); render();
+      lastRec = null; renderLast(); renderCounts(); enterSession(); render();
       if (mode !== 'test') showSessionReminder(); else $('remind').hidden = true;
-      $('quietLine').hidden = false;
       session.timer = setInterval(tickSession, 250); tickSession();
     }, e => { setBusy(null); releaseWake(); note(micError(e)); });
   }
@@ -515,8 +527,8 @@
   }
   function tickSession() {
     if (!session) return;
-    if (session.endAt) { const left = (session.endAt - Date.now()) / 1000; $('readout').textContent = fmt(left); if (left <= 0) { stopSession(true); return; } }
-    else $('readout').textContent = fmt((Date.now() - session.startedAt) / 1000);
+    if (session.endAt) { const left = (session.endAt - Date.now()) / 1000; $('sReadout').textContent = fmt(left); if (left <= 0) { stopSession(true); return; } }
+    else $('sReadout').textContent = fmt((Date.now() - session.startedAt) / 1000);
     if (!ctrl || session.paused) return;
     // the quiet timer: since your last words (or since the start)
     const g = ctrl.seg, talking = !!(g && g.speaker === 'me');
@@ -547,7 +559,7 @@
     if (ctrl) ctrl.stop();
     releaseMic(); if (!showCtx) releaseWake();
     const c = ctrl ? ctrl.counts : { talk: 0 };
-    $('quietLine').hidden = true; $('remind').hidden = true;
+    $('remind').hidden = true; leaveSession();
     refreshReadout(); setBusy(null);
     live(finished ? 'done' : 'off', finished ? `Done. You talked ${c.talk} time${c.talk === 1 ? '' : 's'}.` : 'Stopped');
     // keep the session (30 seconds or longer) and open its summary
@@ -601,6 +613,9 @@
     $('budgetBar').style.width = Math.min(100, 100 * talk / bud).toFixed(1) + '%'; $('budgetTrack').classList.toggle('over', over);
     $('budgetOut').textContent = shared.budget + ' min';
     const n = streakDays(m); $('streak').textContent = n === 1 ? '1 day' : `${n} days`;
+    const tl = $('todayLine'), b = document.createElement('b'); b.textContent = clock(talk); tl.textContent = ''; tl.classList.toggle('over', over);
+    tl.append('Today: ', b, over ? ` talk, over the ${clock(bud)} budget` : ` of ${clock(bud)} talk`);
+    $('progressStatus').textContent = n ? (n === 1 ? '1 day in budget' : `${n} days in budget`) : '';
     renderWeek(m, quick);
   }
   function renderWeek(m, quick) {
@@ -684,6 +699,7 @@
     showSummary(rec.summary);
     $('askClaude').disabled = false; $('askClaude').textContent = rec.summary ? 'Ask Claude again' : 'Ask Claude for a summary';
     $('claudeHint').textContent = CLAUDE_HINT; $('endDelete').hidden = !review;
+    $('endTip').hidden = !!review || !(rec.others > 0) || !!profile.othSegs.length || !!(voice && voice.N && voice.N.length);
     openSheet('end');
   }
   function showSummary(t) { $('endSummary').hidden = !t; $('endSummaryText').textContent = t || ''; }
@@ -777,11 +793,18 @@
   /* ---------- reminders: Qur'an (Tanzil Uthmani) and hadith (sunnah.com), the meaning on a tap ---------- */
   const REM = window.SAMT_REMINDERS || { verses: [], hadith: [] };
   const remItems = () => (REM.verses || []).map(v => Object.assign({ kind: 'verse' }, v)).concat((REM.hadith || []).map(h => Object.assign({ kind: 'hadith' }, h)));
+  /* ﷺ (ṣallā llāhu ʿalayhi wa-sallam, "God bless him and give him peace") is one compact Amiri glyph that blurs at text
+     size, so it gets its own larger span. */
+  function setSaw(el, text) {
+    el.textContent = '';
+    text.split('ﷺ').forEach((part, i) => { if (i) { const s = document.createElement('span'); s.className = 'saw'; s.lang = 'ar'; s.textContent = 'ﷺ'; el.append(s); } if (part) el.append(part); });
+    return el;
+  }
   function fillRem(box, it, full) {
     box.textContent = '';
     const add = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; box.appendChild(e); return e; };
-    if (it.kind === 'hadith') add('p', 'ref', 'The Prophet ﷺ said');
-    const ar = add('p', 'ar', it.text); ar.lang = 'ar'; ar.dir = 'rtl';
+    if (it.kind === 'hadith') setSaw(add('p', 'ref'), 'The Prophet ﷺ said');
+    const ar = add('p', it.kind === 'verse' ? 'ar quran' : 'ar', it.text); ar.lang = 'ar'; ar.dir = 'rtl';
     const ref = add('p', 'ref');
     if (it.kind === 'verse') { const n = document.createElement('span'); n.className = 'arn'; n.lang = 'ar'; n.dir = 'rtl'; n.textContent = it.surah; ref.append(n, ' ' + it.ref); }
     else ref.textContent = it.ref + (it.grade ? ' · ' + it.grade : '');
@@ -798,7 +821,7 @@
     const items = remItems();
     for (const [cap, kind] of [["Qur'an", 'verse'], ['Hadith (sayings of the Prophet ﷺ)', 'hadith']]) {
       const list = items.filter(x => x.kind === kind); if (!list.length) continue;
-      const h = document.createElement('h3'); h.className = 'cap'; h.textContent = cap; box.appendChild(h);
+      const h = document.createElement('h3'); h.className = 'cap'; setSaw(h, cap); box.appendChild(h);
       for (const it of list) { const g = document.createElement('div'); g.className = 'group'; const r = document.createElement('div'); r.className = 'rem'; fillRem(r, it, true); g.appendChild(r); box.appendChild(g); }
     }
     $('remSource').textContent = REM.sources || '';
@@ -810,6 +833,125 @@
     const i = (+shared.remindAt || 0) % items.length; shared.remindAt = (i + 1) % items.length; saveShared();
     fillRem(box, items[i], false); box.hidden = false;
   }
+
+  /* ---------- views: Home, the session, and the pages under Home (Back, and the iPad's back gesture) ---------- */
+  const VIEWS = { home: 'vHome', session: 'vSession', progress: 'vProgress', settings: 'vSettings', phrases: 'vPhrases' };
+  let view = 'home';
+  function goView(v, how) {
+    if (!VIEWS[v]) v = 'home';
+    for (const k of Object.keys(VIEWS)) $(VIEWS[k]).hidden = k !== v;
+    const changed = v !== view; view = v; document.body.dataset.view = v;
+    try { if (how === 'push') window.history.pushState({ samt: v }, ''); else if (how === 'replace') window.history.replaceState({ samt: v }, ''); } catch (e) {}
+    if (!changed) return;
+    window.scrollTo(0, 0);
+    if (v === 'progress') { renderToday(); renderHistory(); }
+    const h = $(VIEWS[v]).querySelector('.ptitle'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
+  }
+  window.addEventListener('popstate', e => {
+    if (session) { try { window.history.pushState({ samt: 'session' }, ''); } catch (err) {} return; } // a running session stays on screen
+    const v = e.state && e.state.samt; goView(v && v !== 'session' ? v : 'home', 'none');
+  });
+  function goBack() {
+    const st = window.history.state;
+    if (st && st.samt && st.samt !== 'home' && window.history.length > 1) window.history.back();
+    else goView(view === 'phrases' ? 'settings' : 'home', 'replace');
+  }
+  function enterSession() {
+    document.body.classList.add('in-session');
+    $('sKind').textContent = session.mode === 'test' ? 'Test, no echo' : session.kind === 'conversation' ? 'Conversation' : 'Silence';
+    goView('session', 'push'); // its own history entry, so a Back swipe lands on the popstate guard instead of leaving Samt
+  }
+  function leaveSession() {
+    document.body.classList.remove('in-session');
+    if (openSheets.includes('details')) closeSheet('details');
+    const ours = window.history.state && window.history.state.samt === 'session';
+    goView('home', 'none');
+    if (ours) try { window.history.back(); } catch (e) {} // drop the session's entry; the popstate lands on Home again
+  }
+  const LEVEL = { '-1': 'Looser', 0: 'Balanced', 1: 'Stricter' };
+  function settingsValues() {
+    $('echoStatus').textContent = `${settings.delay} ms · ${settings.vol}%`;
+    $('matchStatus').textContent = settings.strict === settings.psens ? LEVEL[settings.strict] : `${LEVEL[settings.strict]}, phrases ${LEVEL[settings.psens].toLowerCase()}`;
+  }
+  const convText = () => `${settings.limit} s turns · ${settings.noInterrupt ? 'no interrupting' : 'interrupting allowed'} · ${settings.nudge ? 'nudge first' : 'no nudge'}`;
+  /* The first time Conversation is picked, offer the phrases (once). */
+  function maybeOfferPhrases() {
+    const key = 'samt.' + MODE + '.phraseOffer';
+    try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch (e) { return; }
+    if (!voice || !voice.ready || book.phrases.some(p => p.takes.length >= 2)) return;
+    ask({ title: 'Let greetings pass?', msg: 'Say salam, thanks and short answers 3 times each, about 2 minutes, and Samt lets them through with no echo.',
+      actions: [{ label: 'Record the phrases', run: () => recordPhrases(book.phrases.filter(p => p.takes.length < 2).map(p => p.id)) }, { label: 'Not now', run: () => {} }] });
+  }
+  /* Ending a real session takes a 2-second hold while a ring fills, so it can't happen by accident or on impulse. A test stops with a tap. */
+  function wireHoldStop() {
+    const b = $('stop'); let t = 0;
+    const cancel = tell => { if (!t) return; clearTimeout(t); t = 0; b.classList.remove('holding'); if (tell) toast('Hold Stop for 2 seconds to end the session.'); };
+    const begin = () => {
+      if (!session) return;
+      if (session.mode === 'test') { stopSession(false); return; }
+      if (t) return;
+      b.classList.add('holding');
+      t = setTimeout(() => { t = 0; b.classList.remove('holding'); stopSession(false); }, 2000);
+    };
+    b.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' || e.button === 0) begin(); });
+    b.addEventListener('pointerup', () => cancel(true));
+    b.addEventListener('pointerleave', () => cancel(false));
+    b.addEventListener('pointercancel', () => cancel(false));
+    b.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && !e.repeat) { e.preventDefault(); begin(); } });
+    b.addEventListener('keyup', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); cancel(true); } });
+    b.addEventListener('contextmenu', e => e.preventDefault());
+  }
+
+  /* ---------- setup's last step: ten seconds of the real echo, to hear it once and check that Samt knows the voice ---------- */
+  let wantEchoTest = false, echoTest = null;
+  function openEchoTest() {
+    if (busy || !voice || !voice.ready) return;
+    $('testText').textContent = 'Tap Start, then say anything for a few seconds, like counting to ten. You should hear yourself a moment late in your headphones.';
+    $('testHint').textContent = ''; $('testProg').style.transform = 'scaleX(0)';
+    $('testStart').hidden = false; $('testStart').textContent = 'Start'; $('testDone').hidden = true; $('testMore').hidden = true;
+    $('testSkip').hidden = false; $('testSkip').textContent = 'Skip the test';
+    openSheet('test');
+  }
+  function startEchoTest() {
+    if (echoTest || busy) return;
+    const started = ensureMic(); // inside the tap
+    $('testStart').hidden = true; $('testHint').textContent = 'Starting the mic'; setBusy('echotest');
+    started.then(() => {
+      listener.reset(); voice.strict = strictValue(); book.sens = phraseSens();
+      const t = { me: 0, speech: 0, echo: false, start: listener.fs.nFrames };
+      t.ctrl = new Controller({ listener, voice, book, onEcho: setEcho, onEvent: e => {
+        if (e.type === 'segment') { t.speech++; if (e.rec.speaker === 'me') t.me++; }
+        else if (e.type === 'verdict' && e.isMe) t.me++;
+        else if (e.type === 'state' && e.state === 'echo') t.echo = true;
+      } });
+      t.ctrl.start('silence');
+      t.timer = setInterval(() => {
+        const sec = (listener.fs.nFrames - t.start) / 100;
+        $('testProg').style.transform = `scaleX(${Math.min(1, sec / 10).toFixed(3)})`;
+        $('testHint').textContent = t.echo ? 'That was you. Keep talking to hear the echo.' : `Listening, ${Math.max(0, Math.ceil(10 - sec))} s`;
+        if (sec >= 10) endEchoTest('done');
+      }, 200);
+      echoTest = t;
+    }, e => { setBusy(null); $('testStart').hidden = false; $('testHint').textContent = micError(e); });
+  }
+  function endEchoTest(why) {
+    const t = echoTest; echoTest = null;
+    if (t) { clearInterval(t.timer); try { t.ctrl.stop(); } catch (e) {} releaseMic(); setBusy(null); }
+    if (why === 'skip' || why === 'close') { closeSheet('test'); return; }
+    $('testHint').textContent = '';
+    if (why === 'stopped') { $('testHint').textContent = 'The mic stopped.'; $('testStart').hidden = false; $('testStart').textContent = 'Try again'; return; }
+    if (t && (t.me > 0 || t.echo)) {
+      $('testText').textContent = "Samt knows your voice and turned the echo on. You're set.";
+      $('testDone').hidden = false; $('testSkip').hidden = true;
+    } else if (t && t.speech > 0) {
+      $('testText').textContent = "Samt heard talking but didn't recognise it as you yet. Reading a little more usually fixes it.";
+      $('testMore').hidden = false; $('testSkip').textContent = 'Continue anyway';
+    } else {
+      $('testText').textContent = "Samt didn't hear any talking. Check that your headphones' mic is on, then try again.";
+      $('testStart').hidden = false; $('testStart').textContent = 'Try again'; $('testSkip').textContent = 'Continue anyway';
+    }
+  }
+  closers.test = () => endEchoTest('close');
 
   /* ---------- rendering ---------- */
   function setBusy(b) { busy = b; render(); }
@@ -824,14 +966,22 @@
     $('phrStatus').textContent = `${ready} of ${book.phrases.length} recorded.`;
     $('teachVoice').disabled = !idle || !modelOk; $('teachOthers').disabled = !idle || !taught || !modelOk;
     $('recordAll').disabled = !idle; $('resetAll').disabled = !idle; $('restoreBtn').disabled = !idle; $('backupBtn').disabled = !idle || !taught;
-    const inS = busy === 'silence', inT = busy === 'test', paused = !!(session && session.paused);
-    $('go').disabled = !(idle || inS || (inT && paused)) || !taught || !modelOk;
-    $('test').disabled = !(idle || inT) || !taught || !modelOk;
-    $('go').textContent = paused ? 'Resume' : inS ? 'Stop' : settings.kind === 'conversation' ? 'Start conversation' : 'Start silence';
-    $('test').textContent = inT ? 'Stop test' : 'Test without echo';
-    $('test').hidden = inS; $('pass').hidden = !inS || paused;
+    const paused = !!(session && session.paused), test = !!(session && session.mode === 'test');
+    // Home: teach your voice first, or start a session
+    $('setupCard').hidden = taught; $('readyCard').hidden = !taught;
+    $('setupStart').disabled = !idle || !modelOk;
+    $('setupModel').hidden = modelOk; if (!modelOk) $('setupModel').textContent = 'Getting the voice model ready: ' + $('modelStatus').textContent.toLowerCase();
+    $('go').disabled = $('test').disabled = !idle || !taught || !modelOk;
+    $('go').textContent = settings.kind === 'conversation' ? 'Start conversation' : 'Start silence';
     $('kindSeg').querySelectorAll('button').forEach(b => { b.disabled = !idle; });
-    if (idle && $('live').dataset.state === 'off') live('off', !modelOk ? 'Loading the voice model' : taught ? 'Ready' : 'Teach Samt your voice to begin');
+    settingsValues();
+    $('convLine').hidden = settings.kind !== 'conversation'; $('convLine').textContent = convText(); $('convStatus').textContent = `${settings.limit} s turns`;
+    $('toProgress').hidden = !history.length;
+    $('phrCount').textContent = `${book.phrases.filter(p => p.takes.length >= 2).length} of ${book.phrases.length}`;
+    $('endTeachOthers').disabled = !idle;
+    // the session view
+    $('resume').hidden = !paused; $('pass').hidden = paused || test;
+    $('stopText').textContent = test ? 'Stop test' : 'Hold to stop'; $('stop').classList.toggle('hold', !test); $('stop').querySelector('.ring').style.display = test ? 'none' : '';
     renderPhrases();
   }
   function renderPhrases() {
@@ -863,9 +1013,44 @@
 
   /* ---------- wiring ---------- */
   function wire() {
-    $('go').onclick = () => { if (session && session.paused) resumeAudio(); else if (busy === 'silence') stopSession(false); else startSession('silence'); };
-    $('test').onclick = () => busy === 'test' ? stopSession(false) : startSession('test');
-    $('teachVoice').onclick = () => teachVoice('me');
+    $('go').onclick = () => startSession('silence');
+    $('test').onclick = () => startSession('test');
+    $('resume').onclick = resumeAudio;
+    wireHoldStop();
+    $('setupStart').onclick = () => { wantEchoTest = true; teachVoice('me'); };
+    $('teachVoice').onclick = () => {
+      if (!voice || !voice.ready) { wantEchoTest = true; teachVoice('me'); return; }
+      ask({ title: 'Your voice', msg: `Samt knows ${Math.round(frames(profile.meSegs) / 100)} seconds of your voice. If you start over, the old voice keeps working until the new one is saved.`,
+        actions: [{ label: 'Add more of your voice', run: () => teachVoice('me') }, { label: 'Start over', run: () => { wantEchoTest = true; teachVoice('me', { fresh: true }); } }, { label: 'Hear the echo test', run: openEchoTest }] });
+    };
+    $('recResume').onclick = async () => {
+      if (!rec || !rec.paused) return;
+      mic.prime(); // inside the tap
+      try {
+        if (!mic.trackLive()) { mic.stop(); await ensureMic(); }
+        else if (!(await mic.resume())) throw Object.assign(new Error('x'), { name: 'AudioNotRunning' });
+        listener.reset(); rec.paused = false; $('recResume').hidden = true; $('recHint').textContent = 'Listening again.';
+      } catch (e) { note(micError(e)); }
+    };
+    // pages, sheets and the session's own tools
+    $('toProgress').onclick = () => goView('progress', 'push');
+    $('toSettings').onclick = () => goView('settings', 'push');
+    $('toPhrases').onclick = () => goView('phrases', 'push');
+    document.addEventListener('click', e => { if (e.target.closest('[data-back]')) { e.preventDefault(); goBack(); } });
+    $('readout').onclick = () => openSheet('timer');
+    $('timerClose').onclick = $('timerDone').onclick = () => closeSheet('timer');
+    $('convLine').onclick = $('toConv').onclick = () => openSheet('conv');
+    $('convClose').onclick = $('convDone').onclick = () => closeSheet('conv');
+    for (const k of ['echo', 'match', 'data', 'about']) { $('to' + k[0].toUpperCase() + k.slice(1)).onclick = () => openSheet(k); $(k + 'Close').onclick = $(k + 'Done').onclick = () => closeSheet(k); }
+    $('detailsBtn').onclick = () => { renderCounts(); renderLast(); openSheet('details'); };
+    $('detailsClose').onclick = () => closeSheet('details');
+    $('sCard').onclick = () => $('openCards').click();
+    $('sSign').onclick = () => $('openSign').click();
+    $('testStart').onclick = startEchoTest;
+    $('testDone').onclick = () => closeSheet('test');
+    $('testSkip').onclick = () => endEchoTest('skip');
+    $('testMore').onclick = () => { closeSheet('test'); wantEchoTest = true; teachVoice('me'); };
+    $('endTeachOthers').onclick = () => { closeEnd(); teachVoice('oth'); };
     $('teachOthers').onclick = () => teachVoice('oth');
     $('recordAll').onclick = () => { const ids = book.phrases.filter(p => p.takes.length < 2).map(p => p.id); recordPhrases(ids.length ? ids : book.phrases.map(p => p.id)); };
     $('recDone').onclick = () => rec && rec.finish(false);
@@ -882,9 +1067,9 @@
       else if (rec) rec.finish(true);
     });
     // the kind of session, talking freely, and the conversation rules
-    seg($('kindSeg'), [{ v: 'silence', label: 'Silence' }, { v: 'conversation', label: 'Conversation' }], settings.kind, v => { settings.kind = v; saveSettings(); render(); renderCounts(); });
+    seg($('kindSeg'), [{ v: 'silence', label: 'Silence' }, { v: 'conversation', label: 'Conversation' }], settings.kind, v => { settings.kind = v; saveSettings(); render(); renderCounts(); if (v === 'conversation') maybeOfferPhrases(); });
     $('pass').onclick = () => { if (!ctrl || !session || session.mode === 'test' || session.paused) return; ctrl.pass(Math.min(60, ctrl.passLeft() + 10)); tickSession(); };
-    const applyConv = () => { if (ctrl && session && session.kind === 'conversation') Object.assign(ctrl.p, convParams()); };
+    const applyConv = () => { if (ctrl && session && session.kind === 'conversation') Object.assign(ctrl.p, convParams()); render(); };
     const sw = (id, key) => { const el = $(id), sync = () => el.setAttribute('aria-checked', String(!!settings[key])); el.onclick = () => { settings[key] = !settings[key]; saveSettings(); sync(); applyConv(); }; sync(); };
     sw('swInterrupt', 'noInterrupt'); sw('swNudge', 'nudge');
     // the daily budget
@@ -910,7 +1095,7 @@
     $('showWords').onclick = changeSignWords;
     $('openRemind').onclick = () => { renderRemList(); openSheet('rem'); };
     $('remClose').onclick = () => closeSheet('rem');
-    $('swRemind').onclick = () => { shared.remind = !shared.remind; saveShared(); $('swRemind').setAttribute('aria-checked', String(shared.remind)); $('remindStatus').textContent = shared.remind ? 'On' : 'Off'; };
+    $('swRemind').onclick = () => { shared.remind = !shared.remind; saveShared(); $('swRemind').setAttribute('aria-checked', String(shared.remind)); };
     // a session's end
     moodCtl = seg($('moodSeg'), [{ v: 'easy', label: 'Easy' }, { v: 'okay', label: 'Okay' }, { v: 'hard', label: 'Hard' }], null, v => { endMood = v; });
     $('endDone').onclick = closeEnd; $('endClose').onclick = closeEnd; $('askClaude').onclick = askClaude;
@@ -933,12 +1118,14 @@
       $(up).onclick = () => { settings[key] = Math.min(hi, settings[key] + step); saveSettings(); show(); apply(); };
       show();
     };
-    stepper('delay', 'delayDown', 'delayUp', 'delayOut', 20, 60, 400, v => v + ' ms', () => mic.setDelay(settings.delay / 1000));
-    stepper('vol', 'volDown', 'volUp', 'volOut', 10, 10, 100, v => v + '%', () => mic.setVolume(settings.vol / 100));
-    stepper('limit', 'limitDown', 'limitUp', 'limitOut', 5, 5, 60, v => v + ' s', () => { if (ctrl && session && session.kind === 'conversation') Object.assign(ctrl.p, convParams()); });
+    stepper('delay', 'delayDown', 'delayUp', 'delayOut', 20, 60, 400, v => v + ' ms', () => { mic.setDelay(settings.delay / 1000); settingsValues(); });
+    const volApply = () => { mic.setVolume(settings.vol / 100); $('volOut').textContent = $('dVolOut').textContent = settings.vol + '%'; settingsValues(); };
+    stepper('vol', 'volDown', 'volUp', 'volOut', 10, 10, 100, v => v + '%', volApply);
+    stepper('vol', 'dVolDown', 'dVolUp', 'dVolOut', 10, 10, 100, v => v + '%', volApply); // the same volume, inside a session
+    stepper('limit', 'limitDown', 'limitUp', 'limitOut', 5, 5, 60, v => v + ' s', () => { if (ctrl && session && session.kind === 'conversation') Object.assign(ctrl.p, convParams()); render(); });
     const LSB = [{ v: -1, label: 'Looser' }, { v: 0, label: 'Balanced' }, { v: 1, label: 'Stricter' }];
-    seg($('strictSeg'), LSB, settings.strict, v => { settings.strict = v; saveSettings(); if (voice) voice.strict = strictValue(); });
-    seg($('psensSeg'), LSB, settings.psens, v => { settings.psens = v; saveSettings(); book.sens = phraseSens(); });
+    seg($('strictSeg'), LSB, settings.strict, v => { settings.strict = v; saveSettings(); if (voice) voice.strict = strictValue(); settingsValues(); });
+    seg($('psensSeg'), LSB, settings.psens, v => { settings.psens = v; saveSettings(); book.sens = phraseSens(); settingsValues(); });
     seg($('themeSeg'), [{ v: 'auto', label: 'Auto' }, { v: 'day', label: 'Day' }, { v: 'night', label: 'Night' }], themePref(), v => { try { localStorage.setItem('samt.theme', v); } catch (e) {} applyTheme(); });
     $('backupBtn').onclick = backup;
     $('restoreBtn').onclick = () => $('restoreFile').click();
@@ -960,12 +1147,15 @@
     await loadAll();
     if (!(await store.available())) $('storeWarn').hidden = false;
     live('off', 'Ready'); render(); renderCounts();
-    $('remindStatus').textContent = shared.remind ? 'On' : 'Off';
+    try { window.history.replaceState({ samt: 'home' }, ''); } catch (e) {}
+    goView('home', 'none');
     try { await loadHistory(); } catch (e) {}
-    renderHistory(); renderToday();
+    renderHistory(); renderToday(); render();
     setInterval(() => { if (!session) renderToday(true); }, 60000); // a new day starts at midnight
     document.addEventListener('visibilitychange', async () => { if (document.visibilityState === 'visible' && !session) { try { await loadHistory(); } catch (e) {} renderHistory(); renderToday(); } });
-    debug.history = () => history; debug.shared = shared;
+    // fetch the Amiri fonts once the page has settled, so a session's first reminder doesn't flash in another font
+    setTimeout(() => { try { for (const f of ['"Amiri Quran"', 'Amiri', '"Samt Arabic"']) document.fonts.load('26px ' + f, 'ق').catch(() => {}); } catch (e) {} }, 2000);
+    debug.history = () => history; debug.shared = shared; debug.view = () => view; debug.trouble = onTrouble;
     if (FAKE) { debug.feed = async (name, url) => { const b = await (await fetch(url)).arrayBuffer(); return mic.play(name, new Float32Array(b)); }; debug.ensureEngine = ensureMic; }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();

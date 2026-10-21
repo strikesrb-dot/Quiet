@@ -1,4 +1,4 @@
-Samt v4
+Samt v5
 =======
 
 Samt is already online at https://samt-quiet.netlify.app. This zip is a copy of
@@ -9,7 +9,7 @@ not from the Files app.
 
 Putting this copy online by hand with Netlify:
 1. In Safari on the iPad, sign in at app.netlify.com.
-2. Add new site > Deploy manually, then tap the upload area and pick samt-v4.zip.
+2. Add new site > Deploy manually, then tap the upload area and pick samt-v5.zip.
 3. Open the site's link in Safari and choose Samt Light or Samt Neural.
 4. Tap a start button and allow the microphone.
 5. Optional: Share > Add to Home Screen. Safari then won't clear your setup
@@ -21,7 +21,9 @@ Claude" instead. Everything else works the same.
 
 What's inside
   index.html               chooser page
-  light/index.html         Samt Light (everything in one file, works offline once loaded)
+  light/index.html         Samt Light (one page, works offline once loaded)
   neural/index.html        Samt Neural (loads ONNX Runtime from jsDelivr)
   neural/voice-model.onnx  on-device voice-ID model (WeSpeaker ResNet34, 8-bit weights, 6.4 MB)
-  _headers                 caching rule for the model file
+  fonts/                   Amiri Quran (the verses) and Amiri (all other Arabic), with
+                           their licence, the SIL Open Font License (OFL.txt)
+  _headers                 caching rules for the model and the fonts

@@ -46,6 +46,8 @@ for mode, p in PAGES.items():
     for icon in ("icon-180.png", "icon-512.png"):
         shutil.copy(os.path.join(SRC, "extra", icon), os.path.join(OUT, mode, icon))
 shutil.copy(os.path.join(SRC, "chooser.html"), os.path.join(OUT, "index.html"))
+# Amiri and Amiri Quran (SIL OFL 1.1, with OFL.txt), shared by both pages as ../fonts/
+shutil.copytree(os.path.join(SRC, "fonts"), os.path.join(OUT, "fonts"), dirs_exist_ok=True)
 assert os.path.exists(os.path.join(OUT, "neural", "voice-model.onnx")), "site/neural/voice-model.onnx is missing"
 for root, _, files in os.walk(OUT):
     for name in sorted(files):
