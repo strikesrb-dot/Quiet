@@ -315,6 +315,20 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
 #detailsBtn { justify-self: center; }
 .ic.up { width: 16px; height: 16px; transform: rotate(-90deg); }
 
+/* setup, step by step: a five-part bar for where you are (done in clay, this step in ink), one step's card at a time */
+.wz-bar { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-top: -8px; }
+.wz-bar > i { height: 6px; border-radius: var(--q-r-cap); background: var(--q-fill); transition: background-color 300ms var(--q-ease); }
+.wz-bar > i[data-s="done"] { background: var(--q-acc); }
+.wz-bar > i[data-s="skipped"] { background: var(--q-acc-soft); }
+.wz-bar > i[data-s="now"] { background: var(--q-strong); }
+.wz-count { margin: 0 0 -6px; color: var(--q-ink3); font: 600 var(--q-t-min)/1.3 var(--q-ui); }
+.wz-res { display: grid; gap: 6px; padding: 14px 16px; border-radius: var(--q-r-ctl); background: var(--q-fill); }
+.wz-res .tlbar + .tl-top { margin-top: 8px; }
+.cstatus.good { color: var(--q-acc); }
+.wz-sumt { padding: 0 var(--q-row-px); }
+.wz-nav { display: flex; align-items: center; min-height: var(--tap); margin-top: -12px; }
+.wz-nav #wzNext { margin-inline-start: auto; }
+
 @media (prefers-reduced-motion: reduce) {
   .showv, .show-body, .tlbar > i, .sw, .sw::after { transition: opacity 150ms linear !important; } /* overrides the springs: Reduce Motion is a 150 ms fade */
   .sheet, .asheet, .toast, .seg .th, .pressable { transition: opacity 150ms linear !important; } /* overrides the springs: Reduce Motion is a 150 ms fade */
@@ -342,6 +356,7 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
   <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-turn" viewBox="0 0 24 24"><path d="M4.5 10.5a8 8 0 0 1 14-3.5l1.5 1.5"/><path d="M20 4v4.5h-4.5"/><path d="M19.5 13.5a8 8 0 0 1-14 3.5L4 15.5"/><path d="M4 20v-4.5h4.5"/></symbol>
+  <symbol id="i-steps" viewBox="0 0 24 24"><path d="M3.5 6.5l1.7 1.7 3-3.2M3.5 12.5l1.7 1.7 3-3.2"/><circle cx="5.5" cy="18.5" r="1.7"/><path d="M11.5 7h9M11.5 13h9M11.5 18.5h9"/></symbol>
 </svg>
 <main class="win">
   <header class="head" id="appHead">
@@ -350,13 +365,13 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
   </header>
   <p id="note" class="note" role="alert" hidden></p>
 
-  <!-- HOME: teach your voice first, or start a session. Cards, the sign and reminders work either way. -->
+  <!-- HOME: set up first (step by step), or start a session. Cards, the sign and reminders work either way. -->
   <section id="vHome" class="view" aria-label="Home">
     <section id="setupCard" class="card glass" aria-labelledby="setupTitle" hidden>
-      <h2 class="ctitle" id="setupTitle">Teach Samt your voice</h2>
-      <p class="cbody">Read a short passage out loud, about 45 seconds, wearing the headphones you'll use. Then hear the echo once, about 10 seconds.</p>
+      <h2 class="ctitle" id="setupTitle">Set up Samt</h2>
+      <p class="cbody">Five short steps, about 5 minutes: your voice, the echo, other voices, a check that Samt can tell you apart, and phrases. Wear the headphones you'll use.</p>
       <p class="cstatus" id="setupModel" hidden></p>
-      <button id="setupStart" class="btn strong" type="button">Start reading</button>
+      <button id="setupStart" class="btn strong" type="button">Start setup</button>
       <p class="cnote">Sessions open once Samt knows your voice. Cards, the sign and reminders work now.</p>
     </section>
 
@@ -435,6 +450,7 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
     <section class="sec" aria-labelledby="capTeach">
       <h3 class="cap" id="capTeach">Your voice</h3>
       <div class="group">
+        <button class="row gl" id="toWizard" type="button"><svg class="ic"><use href="#i-steps"/></svg><span class="rt">Step-by-step setup</span><span class="rv" id="wizStatus"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
         <button class="row gl" id="teachVoice" type="button"><svg class="ic"><use href="#i-mic"/></svg><span class="rt">Your voice</span><span class="rv" id="voiceStatus">Not taught</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
         <button class="row gl" id="teachOthers" type="button"><svg class="ic"><use href="#i-people"/></svg><span class="rt">Other voices</span><span class="rv" id="othStatus">Recommended</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
         <button class="row gl" id="toPhrases" type="button"><svg class="ic"><use href="#i-hush"/></svg><span class="rt">Phrases that pass</span><span class="rv" id="phrCount"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
@@ -471,6 +487,32 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
       <form id="addPhrase" class="row"><input id="newPhrase" class="field grow" type="text" maxlength="60" placeholder="Add your own phrase" aria-label="New phrase"><button class="btn plain" type="submit">Add</button></form>
     </div>
     <p class="foot">Say each phrase 3 times. When Samt hears one of them from you, it lets it through with no echo. Replies shorter than half a second already pass. <span id="phrStatus"></span></p>
+  </section>
+
+  <!-- SETUP, STEP BY STEP (first open, and again from Settings): one step at a time, each step's result in its card -->
+  <section id="vWizard" class="view" aria-labelledby="wzTitle" hidden>
+    <div class="pagehead"><button class="back" type="button" data-back><svg class="ic" aria-hidden="true"><use href="#i-back"/></svg><span id="wzBack">Samt</span></button></div>
+    <h2 class="ptitle" id="wzTitle">Set up Samt</h2>
+    <div class="wz-bar" id="wzBar" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    <section id="wzCard" class="card glass" aria-labelledby="wzStepTitle" aria-live="polite">
+      <p class="wz-count" id="wzCount">Step 1 of 5</p>
+      <h3 class="ctitle" id="wzStepTitle">Your voice</h3>
+      <p class="cbody" id="wzBody"></p>
+      <div class="wz-res" id="wzRes" hidden>
+        <div class="tl-top"><span>Caught you</span><b id="wzYou"></b></div><div class="tlbar" aria-hidden="true"><i id="wzYouBar"></i></div>
+        <div class="tl-top"><span>Ignored others</span><b id="wzOth"></b></div><div class="tlbar" aria-hidden="true"><i id="wzOthBar"></i></div>
+      </div>
+      <p class="cstatus" id="wzStatus" hidden></p>
+      <button id="wzMain" class="btn strong" type="button">Start reading</button>
+      <button id="wzAlt" class="btn glass" type="button" hidden></button>
+    </section>
+    <section id="wzSum" class="sec" aria-labelledby="wzSumTitle" hidden>
+      <h3 class="ctitle wz-sumt" id="wzSumTitle">All set</h3>
+      <div class="group" id="wzSumList"></div>
+      <p class="foot">Tap a step to do it again. This page is in Settings too.</p>
+    </section>
+    <button id="wzFinish" class="btn strong" type="button" hidden>Finish</button>
+    <div class="wz-nav"><button id="wzPrev" class="btn plain" type="button">Previous</button><button id="wzNext" class="btn plain" type="button">Skip</button></div>
   </section>
 </main>
 

@@ -13,8 +13,8 @@ Each version keeps its own setup in the browser (IndexedDB), with a backup file 
 
 How it is laid out, by stage (Home shows only what fits where you are):
 
-- **Before your voice is taught**, Home offers one thing: read a short passage (about 45 seconds), then hear the echo
-  once (about 10 seconds). Sessions open after that. Cards, the sign and reminders work from the start.
+- **Before your voice is taught**, Home offers one thing: Set up Samt, five steps one at a time (see below). Sessions
+  open after the first step. Cards, the sign and reminders work from the start.
 - **Ready.** Home has the session length (tap the time), Silence or Conversation, Start, a test without echo, and
   today's talk time; then three quick tools (Card, Sign, Reminders) and two rows, Progress and Settings.
 - **In a session** the screen shows only the session: time left, the "Quiet for" timer, the live pill, a reminder,
@@ -24,12 +24,30 @@ How it is laid out, by stage (Home shows only what fits where you are):
 - **Afterwards**, the end sheet: the numbers, a mood, a note, and Claude's summary if you ask for it.
 - **Progress**: today against the daily talk budget, days within it, the last 7 days as a chart, past sessions.
   Light and Neural on one device share these.
-- **Settings** is a short index (your voice, other voices, phrases that pass; conversation, echo, matching;
-  appearance; backup and erase; about). Each row shows its value and opens on its own; nothing is deeper than that.
+- **Settings** is a short index (step-by-step setup, your voice, other voices, phrases that pass; conversation, echo,
+  matching; appearance; backup and erase; about). Each row shows its value and opens on its own; nothing is deeper
+  than that.
 
 Silence echoes whenever you talk. Conversation lets you talk for a while each turn (5 to 60 seconds) before the echo;
 talking over someone starts it at once; a soft two-note tone nudges you first. **Talk freely** gives you 10 seconds
 without the echo (each tap adds 10).
+
+## Setup, step by step
+
+The first open starts it, and Settings opens it again (Step-by-step setup). One step at a time, each with its result:
+
+1. **Your voice**: read a short passage, about 45 seconds. The one step that can't be skipped.
+2. **Hear the echo**: about 10 seconds of the real echo, to hear it once and to check that Samt knows the voice.
+3. **Other voices**: about 30 seconds of someone else talking while you stay quiet.
+4. **Check it**: you talk for about 20 seconds, then someone else does; no echo plays. Samt counts the stretches of talk
+   a second or longer: yours it caught (the echo would have come on), theirs it ignored (the echo never would have, not
+   even for a moment). If it took them for you, one tap makes Matching stricter and checks again; if it missed you,
+   one tap makes it looser. Teaching more, or changing Matching, marks the last result out of date. The check only
+   measures: nothing from it is learned.
+5. **Phrases that pass** (optional): the greetings, thanks and short answers, 3 times each.
+
+Then a summary of the five. The steps' state is kept per version (localStorage `samt.<mode>.setup`); erasing the setup
+starts it again.
 
 ## Claude summaries
 

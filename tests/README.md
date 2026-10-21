@@ -6,15 +6,17 @@ timeline in `test.json`). Run them from the repo root after `python3 scripts/bui
 in WebKit (Safari's engine), which is what iPhone and iPad run.
 
 ```bash
-node tests/setup-flow.js webkit light    # setup, test session, real session, end sheet, backup/restore/erase, 5 widths
+node tests/setup-flow.js webkit light    # setup step by step (with the check), test session, real session, end sheet, backup/restore/erase, 5 widths
 node tests/features.js webkit light      # needs the backup the line above saved in tests/out/
 node tests/setup-flow.js webkit neural   # then features.js webkit neural; also chromium light for both
 node tests/live.js                       # after a deploy: live bytes = site/, fonts, model, one real Claude summary
 ```
 
 - `setup-flow.js` prints what it saw (it has no pass/fail count): look for `page errors: none`, `overflow 0px` at
-  390 · 744 · 834 · 1024 · 1440, and sensible test-pass numbers (Light about: talk echoed 86%, phrases passed 88%,
-  others ignored 78%; Neural: 100% / 96% / 96%).
+  390 · 744 · 834 · 1024 · 1440, and sensible test-pass numbers (v6, WebKit: Light talk echoed 86%, phrases passed
+  92%, others ignored 82%; Neural 100% / 96% / 100%). The setup's check uses voices from the test stream that never
+  taught Samt (your talk, then two men's): Light caught you 7 of 7 but ignored the men only 1 of 6, even stricter;
+  Neural 7 of 7 and 6 of 6. The `stretches` line shows each one (E echo to the end, e echo then off, - none).
 - `features.js` ends `ALL PASS` or `N FAILED`.
 - Screenshots and backup files go to `tests/out/` (ignored by git).
 

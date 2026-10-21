@@ -315,6 +315,20 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
 #detailsBtn { justify-self: center; }
 .ic.up { width: 16px; height: 16px; transform: rotate(-90deg); }
 
+/* setup, step by step: a five-part bar for where you are (done in clay, this step in ink), one step's card at a time */
+.wz-bar { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-top: -8px; }
+.wz-bar > i { height: 6px; border-radius: var(--q-r-cap); background: var(--q-fill); transition: background-color 300ms var(--q-ease); }
+.wz-bar > i[data-s="done"] { background: var(--q-acc); }
+.wz-bar > i[data-s="skipped"] { background: var(--q-acc-soft); }
+.wz-bar > i[data-s="now"] { background: var(--q-strong); }
+.wz-count { margin: 0 0 -6px; color: var(--q-ink3); font: 600 var(--q-t-min)/1.3 var(--q-ui); }
+.wz-res { display: grid; gap: 6px; padding: 14px 16px; border-radius: var(--q-r-ctl); background: var(--q-fill); }
+.wz-res .tlbar + .tl-top { margin-top: 8px; }
+.cstatus.good { color: var(--q-acc); }
+.wz-sumt { padding: 0 var(--q-row-px); }
+.wz-nav { display: flex; align-items: center; min-height: var(--tap); margin-top: -12px; }
+.wz-nav #wzNext { margin-inline-start: auto; }
+
 @media (prefers-reduced-motion: reduce) {
   .showv, .show-body, .tlbar > i, .sw, .sw::after { transition: opacity 150ms linear !important; } /* overrides the springs: Reduce Motion is a 150 ms fade */
   .sheet, .asheet, .toast, .seg .th, .pressable { transition: opacity 150ms linear !important; } /* overrides the springs: Reduce Motion is a 150 ms fade */
@@ -342,6 +356,7 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
   <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-turn" viewBox="0 0 24 24"><path d="M4.5 10.5a8 8 0 0 1 14-3.5l1.5 1.5"/><path d="M20 4v4.5h-4.5"/><path d="M19.5 13.5a8 8 0 0 1-14 3.5L4 15.5"/><path d="M4 20v-4.5h4.5"/></symbol>
+  <symbol id="i-steps" viewBox="0 0 24 24"><path d="M3.5 6.5l1.7 1.7 3-3.2M3.5 12.5l1.7 1.7 3-3.2"/><circle cx="5.5" cy="18.5" r="1.7"/><path d="M11.5 7h9M11.5 13h9M11.5 18.5h9"/></symbol>
 </svg>
 <main class="win">
   <header class="head" id="appHead">
@@ -350,13 +365,13 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
   </header>
   <p id="note" class="note" role="alert" hidden></p>
 
-  <!-- HOME: teach your voice first, or start a session. Cards, the sign and reminders work either way. -->
+  <!-- HOME: set up first (step by step), or start a session. Cards, the sign and reminders work either way. -->
   <section id="vHome" class="view" aria-label="Home">
     <section id="setupCard" class="card glass" aria-labelledby="setupTitle" hidden>
-      <h2 class="ctitle" id="setupTitle">Teach Samt your voice</h2>
-      <p class="cbody">Read a short passage out loud, about 45 seconds, wearing the headphones you'll use. Then hear the echo once, about 10 seconds.</p>
+      <h2 class="ctitle" id="setupTitle">Set up Samt</h2>
+      <p class="cbody">Five short steps, about 5 minutes: your voice, the echo, other voices, a check that Samt can tell you apart, and phrases. Wear the headphones you'll use.</p>
       <p class="cstatus" id="setupModel" hidden></p>
-      <button id="setupStart" class="btn strong" type="button">Start reading</button>
+      <button id="setupStart" class="btn strong" type="button">Start setup</button>
       <p class="cnote">Sessions open once Samt knows your voice. Cards, the sign and reminders work now.</p>
     </section>
 
@@ -435,6 +450,7 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
     <section class="sec" aria-labelledby="capTeach">
       <h3 class="cap" id="capTeach">Your voice</h3>
       <div class="group">
+        <button class="row gl" id="toWizard" type="button"><svg class="ic"><use href="#i-steps"/></svg><span class="rt">Step-by-step setup</span><span class="rv" id="wizStatus"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
         <button class="row gl" id="teachVoice" type="button"><svg class="ic"><use href="#i-mic"/></svg><span class="rt">Your voice</span><span class="rv" id="voiceStatus">Not taught</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
         <button class="row gl" id="teachOthers" type="button"><svg class="ic"><use href="#i-people"/></svg><span class="rt">Other voices</span><span class="rv" id="othStatus">Recommended</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
         <button class="row gl" id="toPhrases" type="button"><svg class="ic"><use href="#i-hush"/></svg><span class="rt">Phrases that pass</span><span class="rv" id="phrCount"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
@@ -471,6 +487,32 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
       <form id="addPhrase" class="row"><input id="newPhrase" class="field grow" type="text" maxlength="60" placeholder="Add your own phrase" aria-label="New phrase"><button class="btn plain" type="submit">Add</button></form>
     </div>
     <p class="foot">Say each phrase 3 times. When Samt hears one of them from you, it lets it through with no echo. Replies shorter than half a second already pass. <span id="phrStatus"></span></p>
+  </section>
+
+  <!-- SETUP, STEP BY STEP (first open, and again from Settings): one step at a time, each step's result in its card -->
+  <section id="vWizard" class="view" aria-labelledby="wzTitle" hidden>
+    <div class="pagehead"><button class="back" type="button" data-back><svg class="ic" aria-hidden="true"><use href="#i-back"/></svg><span id="wzBack">Samt</span></button></div>
+    <h2 class="ptitle" id="wzTitle">Set up Samt</h2>
+    <div class="wz-bar" id="wzBar" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    <section id="wzCard" class="card glass" aria-labelledby="wzStepTitle" aria-live="polite">
+      <p class="wz-count" id="wzCount">Step 1 of 5</p>
+      <h3 class="ctitle" id="wzStepTitle">Your voice</h3>
+      <p class="cbody" id="wzBody"></p>
+      <div class="wz-res" id="wzRes" hidden>
+        <div class="tl-top"><span>Caught you</span><b id="wzYou"></b></div><div class="tlbar" aria-hidden="true"><i id="wzYouBar"></i></div>
+        <div class="tl-top"><span>Ignored others</span><b id="wzOth"></b></div><div class="tlbar" aria-hidden="true"><i id="wzOthBar"></i></div>
+      </div>
+      <p class="cstatus" id="wzStatus" hidden></p>
+      <button id="wzMain" class="btn strong" type="button">Start reading</button>
+      <button id="wzAlt" class="btn glass" type="button" hidden></button>
+    </section>
+    <section id="wzSum" class="sec" aria-labelledby="wzSumTitle" hidden>
+      <h3 class="ctitle wz-sumt" id="wzSumTitle">All set</h3>
+      <div class="group" id="wzSumList"></div>
+      <p class="foot">Tap a step to do it again. This page is in Settings too.</p>
+    </section>
+    <button id="wzFinish" class="btn strong" type="button" hidden>Finish</button>
+    <div class="wz-nav"><button id="wzPrev" class="btn plain" type="button">Previous</button><button id="wzNext" class="btn plain" type="button">Skip</button></div>
   </section>
 </main>
 
@@ -1806,10 +1848,10 @@ registerProcessor('samt-tap', SamtTap);
   let ortSession = null, modelP = null, modelMs = 0;
   let session = null; // {mode, endAt, startedAt, timer, paused}
   let wakeLock = null, lastRec = null, toastTimer = 0, pendingFixes = [], howl = 0, echoHoldUntil = 0, starting = null;
-  let history = [], endRec = null, endMood = null, moodCtl = null, showCtx = null, cardsEditing = false, txtResolve = null;
+  let history = [], endRec = null, endMood = null, moodCtl = null, showCtx = null, cardsEditing = false, txtResolve = null, strictCtl = null;
   const mic = FAKE ? new S.mic.FakeMic({ onChunk: onAudio }) : new S.mic.MicEngine({ onChunk: onAudio, onTrouble });
   if (FAKE) mic.speed = +(params.get('speed') || 1);
-  const debug = window.SamtDebug = { listener, mic, get ctrl() { return ctrl; }, get voice() { return voice; }, get book() { return book; }, get engine() { return mic; }, profile: () => profile, events: [] };
+  const debug = window.SamtDebug = { listener, mic, get ctrl() { return ctrl; }, get voice() { return voice; }, get book() { return book; }, get engine() { return mic; }, profile: () => profile, events: [], checkLog: [] };
 
   const feats = s => ({ n: s.n, vec: s.vec, f0: s.f0, eDb: s.eDb });
   const frames = segs => segs.reduce((a, s) => a + s.n, 0);
@@ -2062,7 +2104,7 @@ registerProcessor('samt-tap', SamtTap);
     const t = $('recTitle'); t.textContent = title; t.className = rtl ? 'ar' : ''; t.dir = rtl ? 'rtl' : 'auto';
     const p = $('recPassage'); p.hidden = !passage; p.textContent = passage || '';
     $('recHint').textContent = hint || ''; $('recProg').style.transform = 'scaleX(0)';
-    $('recDone').disabled = true; $('recSkip').hidden = !showSkip; $('recResume').hidden = true;
+    $('recDone').textContent = 'Done'; $('recDone').disabled = true; $('recSkip').hidden = !showSkip; $('recResume').hidden = true;
     if ($('recPanel').hidden) {
       $('recScrim').hidden = false; $('recPanel').hidden = false;
       requestAnimationFrame(() => requestAnimationFrame(() => { $('recScrim').classList.add('show'); $('recPanel').classList.add('show'); }));
@@ -2131,6 +2173,7 @@ registerProcessor('samt-tap', SamtTap);
       }
       book.setStats(profile.meSegs); book.calibrate(profile.meSegs);
       await saveAll();
+      if (wiz.check) { wiz.check.stale = true; saveWiz(); } // the last check was of the voice before this
       toast(kind === 'me' ? 'Learned your voice.' : 'Learned what other voices sound like.');
     } catch (e) { note(e.message || String(e)); }
     live('off', 'Ready'); setBusy(null);
@@ -2595,7 +2638,7 @@ registerProcessor('samt-tap', SamtTap);
   }
 
   /* ---------- views: Home, the session, and the pages under Home (Back, and the iPad's back gesture) ---------- */
-  const VIEWS = { home: 'vHome', session: 'vSession', progress: 'vProgress', settings: 'vSettings', phrases: 'vPhrases' };
+  const VIEWS = { home: 'vHome', session: 'vSession', progress: 'vProgress', settings: 'vSettings', phrases: 'vPhrases', wizard: 'vWizard' };
   let view = 'home';
   function goView(v, how) {
     if (!VIEWS[v]) v = 'home';
@@ -2605,6 +2648,7 @@ registerProcessor('samt-tap', SamtTap);
     if (!changed) return;
     window.scrollTo(0, 0);
     if (v === 'progress') { renderToday(); renderHistory(); }
+    if (v === 'wizard') renderWizard();
     const h = $(VIEWS[v]).querySelector('.ptitle'); if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
   }
   window.addEventListener('popstate', e => {
@@ -2614,7 +2658,7 @@ registerProcessor('samt-tap', SamtTap);
   function goBack() {
     const st = window.history.state;
     if (st && st.samt && st.samt !== 'home' && window.history.length > 1) window.history.back();
-    else goView(view === 'phrases' ? 'settings' : 'home', 'replace');
+    else goView(view === 'phrases' || (view === 'wizard' && wizFrom === 'settings') ? 'settings' : 'home', 'replace');
   }
   function enterSession() {
     document.body.classList.add('in-session');
@@ -2701,8 +2745,9 @@ registerProcessor('samt-tap', SamtTap);
     $('testHint').textContent = '';
     if (why === 'stopped') { $('testHint').textContent = 'The mic stopped.'; $('testStart').hidden = false; $('testStart').textContent = 'Try again'; return; }
     if (t && (t.me > 0 || t.echo)) {
-      $('testText').textContent = "Samt knows your voice and turned the echo on. You're set.";
+      $('testText').textContent = 'Samt knows your voice and turned the echo on.' + (view === 'wizard' ? '' : " You're set.");
       $('testDone').hidden = false; $('testSkip').hidden = true;
+      wiz.echoOk = true; delete wiz.skip.echo; saveWiz(); render();
     } else if (t && t.speech > 0) {
       $('testText').textContent = "Samt heard talking but didn't recognise it as you yet. Reading a little more usually fixes it.";
       $('testMore').hidden = false; $('testSkip').textContent = 'Continue anyway';
@@ -2712,6 +2757,204 @@ registerProcessor('samt-tap', SamtTap);
     }
   }
   closers.test = () => endEchoTest('close');
+
+  /* ---------- the check: you talk, then someone else does; how often Samt got each right. No echo plays. ---------- */
+  // A stretch of talk counts when it lasts a second or more (shorter ones never echo, by design). For you, it's right
+  // when the echo would have come on at any point; for others, when it never would have.
+  const CHECK_SEC = 20, CHECK_MIN = 10;
+  let check = null;
+  function startCheck() {
+    if (busy || !voice || !voice.ready) return;
+    if (MODE === 'neural' && !ortSession) { note('The voice model is still loading.'); return; }
+    const started = ensureMic(); // first, inside the tap
+    note(''); setBusy('check');
+    check = { round: 0, waiting: false, tally: [{ n: 0, ok: 0 }, { n: 0, ok: 0 }] }; debug.checkLog = [];
+    openPanel({ title: 'Round 1 of 2: you talk', passage: 'Talk about anything in your normal voice, like what you did today. Only you, about 20 seconds.', hint: 'Starting the mic' });
+    rec = { kind: 'check', finish: cancel => cancel ? endCheck(true) : check && check.waiting ? beginRound(1) : endRound() };
+    started.then(() => { if (rec && rec.kind === 'check') beginRound(0); }, e => { rec = null; check = null; closePanel(); setBusy(null); note(micError(e)); });
+  }
+  function beginRound(i) {
+    const k = check; if (!k) return;
+    k.round = i; k.waiting = false; k.speech = 0; k.seen = new Set();
+    listener.reset(); voice.strict = strictValue(); book.sens = phraseSens();
+    // Silence's rules (the echo as soon as it's you), in test mode: the verdicts happen, the echo doesn't play
+    const c = new Controller({ listener, voice, book, onEcho: () => {}, params: { limit: 0, interrupt: false, nudge: false }, onEvent: e => {
+      if (k.ctrl !== c) return;
+      if (e.type === 'state' && e.state === 'echo' && c.seg) k.seen.add(c.seg.id);
+      else if (e.type === 'segment') tallySeg(k, e.rec);
+    } });
+    k.ctrl = c; c.start('test');
+    $('recDone').textContent = 'Done'; $('recDone').disabled = true; $('recProg').style.transform = 'scaleX(0)';
+    k.timer = setInterval(() => roundTick(k), 200); roundTick(k);
+  }
+  function tallySeg(k, r) {
+    const sec = (r.end - r.start + 1) / 100, echoed = !!r.echo || k.seen.has(r.id), t = k.tally[k.round];
+    k.speech += sec; debug.checkLog.push({ round: k.round, sec: +sec.toFixed(2), echoed, echoAtEnd: !!r.echo, speaker: r.speaker, passes: r.passes.length });
+    if (k.round === 0) { if (sec >= 1 && !r.passes.length) { t.n++; if (echoed) t.ok++; } } // a phrase that passed isn't a miss
+    else if (sec >= 1 || echoed) { t.n++; if (!echoed) t.ok++; }
+  }
+  function roundTick(k) {
+    if (check !== k || k.waiting || !k.ctrl) return;
+    const g = k.ctrl.seg, sec = k.speech + (g ? Math.max(0, g.next - g.start) / 100 : 0), t = k.tally[k.round];
+    $('recProg').style.transform = `scaleX(${Math.min(1, sec / CHECK_SEC).toFixed(3)})`;
+    $('recHint').textContent = `Listening. ${Math.floor(sec)} of ${CHECK_SEC} seconds` +
+      (t.n ? (k.round === 0 ? `. Caught you ${t.ok} of ${t.n} so far.` : `. Ignored them ${t.ok} of ${t.n} so far.`) : '.');
+    $('recDone').disabled = sec < CHECK_MIN;
+    if (sec >= CHECK_SEC) endRound();
+  }
+  function endRound() {
+    const k = check; if (!k || k.waiting || !k.ctrl) return;
+    clearInterval(k.timer);
+    try { if (k.ctrl.seg) k.ctrl.cut(); } catch (e) {} // count the stretch still going
+    k.ctrl.stop(); k.ctrl = null;
+    if (k.round === 1) { endCheck(false); return; }
+    k.waiting = true; // between the rounds: time to hand over, or start a video
+    $('recTitle').textContent = 'Round 2 of 2: someone else talks';
+    $('recPassage').textContent = "Now stay quiet while someone else talks for about 20 seconds: a person, or a TV or another phone playing a video. Tap Start when they're ready.";
+    $('recProg').style.transform = 'scaleX(0)';
+    $('recHint').textContent = `Round 1: Samt caught you ${k.tally[0].ok} of ${k.tally[0].n} times.`;
+    $('recDone').textContent = 'Start'; $('recDone').disabled = false;
+  }
+  function endCheck(cancel) {
+    const k = check; if (!k) return; check = null;
+    clearInterval(k.timer); if (k.ctrl) { try { k.ctrl.stop(); } catch (e) {} }
+    rec = null; closePanel(); releaseMic();
+    if (!cancel) { wiz.check = { you: [k.tally[0].ok, k.tally[0].n], oth: [k.tally[1].ok, k.tally[1].n], strict: settings.strict, at: Date.now() }; delete wiz.skip.check; saveWiz(); }
+    setBusy(null);
+  }
+  /* What the numbers mean, and the one thing most likely to help. */
+  function checkAdvice(c) {
+    const again = { label: 'Check again', run: startCheck }, next = { label: 'Next', run: () => wizGo(wizAt + 1) };
+    if (c.stale || c.strict !== settings.strict) return { status: 'Samt has changed since this check: it learned more, or Matching changed. Check again to see where it stands.', main: again, next: true };
+    const [yo, yn] = c.you, [oo, on] = c.oth;
+    if (yn < 3 || on < 2) return { status: yn < 3 ? 'Not enough of your talking to judge. Talk a little longer next time.' : 'Not enough of the other voice to judge. Let them talk a little longer next time.', main: again, next: true };
+    const youOk = yo / yn >= 0.8, othOk = oo / on >= 0.9, tip = MODE === 'light' ? ' Samt Neural tells voices apart better.' : '';
+    if (youOk && othOk) return { status: 'Samt can tell you apart.', good: true, main: next, alt: again };
+    if (youOk) return settings.strict < 1
+      ? { status: 'It took them for you sometimes. Stricter matching should help.', main: { label: 'Make it stricter and check again', run: () => setStrict(settings.strict + 1) }, alt: again, next: true }
+      : { status: 'It still took them for you sometimes. More of other voices should help.' + tip, main: { label: 'Add other voices', run: () => teachVoice('oth') }, alt: again, next: true };
+    if (othOk) return settings.strict > -1
+      ? { status: 'It missed you sometimes. Looser matching should help.', main: { label: 'Make it looser and check again', run: () => setStrict(settings.strict - 1) }, alt: again, next: true }
+      : { status: 'It still missed you sometimes. Reading more of your voice should help.', main: { label: 'Read more of your voice', run: () => teachVoice('me') }, alt: again, next: true };
+    return { status: 'It mixed you up both ways. Teaching it more of both should help.' + tip, main: { label: 'Read more of your voice', run: () => teachVoice('me') }, alt: { label: 'Add other voices', run: () => teachVoice('oth') }, next: true };
+  }
+  function setStrict(v) { // from the check: change Matching, then check again in the same tap
+    settings.strict = Math.max(-1, Math.min(1, v)); saveSettings(); if (voice) voice.strict = strictValue();
+    if (strictCtl) strictCtl.set(settings.strict); settingsValues();
+    startCheck();
+  }
+
+  /* ---------- setup, step by step: the first open starts it, Settings opens it again ---------- */
+  const WSTEPS = [
+    { id: 'voice', title: 'Your voice' },
+    { id: 'echo', title: 'Hear the echo', skip: true },
+    { id: 'others', title: 'Other voices', skip: true },
+    { id: 'check', title: 'Check it', skip: true },
+    { id: 'phrases', title: 'Phrases that pass', skip: true, optional: true }
+  ];
+  const WKEY = 'samt.' + MODE + '.setup';
+  const freshWiz = () => ({ skip: {}, echoOk: false, check: null, done: false });
+  let wiz = Object.assign(freshWiz(), (() => { try { return JSON.parse(localStorage.getItem(WKEY) || '{}'); } catch (e) { return {}; } })());
+  if (!wiz.skip || typeof wiz.skip !== 'object') wiz.skip = {};
+  function saveWiz() { try { localStorage.setItem(WKEY, JSON.stringify(wiz)); } catch (e) {} }
+  let wizAt = 0, wizFrom = 'home', wizMain = null, wizAlt = null;
+  const othersTaught = () => profile.othSegs.length > 0 || !!(MODE === 'neural' && voice && voice.N && voice.N.length);
+  const phrasesReady = () => book.phrases.filter(p => p.takes.length >= 2).length;
+  function stepState(id) {
+    const done = id === 'voice' ? !!(voice && voice.ready) : id === 'echo' ? !!wiz.echoOk : id === 'others' ? othersTaught() : id === 'check' ? !!wiz.check : phrasesReady() > 0;
+    return done ? 'done' : wiz.skip[id] ? 'skipped' : 'todo';
+  }
+  const wizSettled = () => WSTEPS.every(s => stepState(s.id) !== 'todo');
+  function wizStatusText() { return wiz.done && wizSettled() ? 'Done' : `${WSTEPS.filter(s => stepState(s.id) === 'done').length} of ${WSTEPS.length}`; }
+  function openWizard(from) {
+    if (busy) return;
+    wizFrom = from; $('wzBack').textContent = from === 'settings' ? 'Settings' : 'Samt';
+    const first = WSTEPS.findIndex(s => stepState(s.id) === 'todo');
+    wizAt = !(voice && voice.ready) ? 0 : first < 0 ? WSTEPS.length : first;
+    goView('wizard', 'push'); renderWizard();
+  }
+  function wizGo(i) {
+    wizAt = Math.max(0, Math.min(WSTEPS.length, i)); renderWizard(); window.scrollTo(0, 0);
+    const h = $(wizAt < WSTEPS.length ? 'wzStepTitle' : 'wzSumTitle'); h.tabIndex = -1; h.focus({ preventScroll: true });
+  }
+  /* Your voice: add more, start over, or hear the echo test (Settings and the first step share these). */
+  function voiceChoices() {
+    const inWiz = view === 'wizard';
+    if (!voice || !voice.ready) { wantEchoTest = !inWiz; teachVoice('me'); return; }
+    ask({ title: 'Your voice', msg: `Samt knows ${Math.round(frames(profile.meSegs) / 100)} seconds of your voice. If you start over, the old voice keeps working until the new one is saved.`,
+      actions: [{ label: 'Add more of your voice', run: () => teachVoice('me') }, { label: 'Start over', run: () => { wantEchoTest = !inWiz; teachVoice('me', { fresh: true }); } }, { label: 'Hear the echo test', run: openEchoTest }] });
+  }
+  function stepView(id, st) {
+    const v = { body: '', status: '', good: false, main: null, alt: null, next: false, skip: false, res: null };
+    const next = { label: 'Next', run: () => wizGo(wizAt + 1) }, modelOk = MODE !== 'neural' || !!ortSession, secs = segs => Math.round(frames(segs) / 100);
+    const todo = (main) => { v.main = main; if (st === 'skipped') { v.status = 'Skipped.'; v.next = true; } else v.skip = !!WSTEPS[wizAt].skip; };
+    if (id === 'voice') {
+      v.body = "Read a short passage out loud in your normal voice, about 45 seconds, wearing the headphones you'll use.";
+      if (st === 'done') { v.status = `Done. Samt knows ${secs(profile.meSegs)} seconds of your voice.`; v.main = next; v.alt = { label: 'Read more', run: voiceChoices }; }
+      else { v.main = { label: 'Start reading', run: () => teachVoice('me'), off: !modelOk }; if (!modelOk) v.status = 'Getting the voice model ready. The first time takes a moment.'; }
+      return v;
+    }
+    if (!(voice && voice.ready)) { v.body = 'This step needs your voice first.'; v.main = { label: 'Go to step 1', run: () => wizGo(0) }; return v; }
+    if (id === 'echo') {
+      v.body = 'Put your headphones on, then say anything for a few seconds, like counting to ten. You should hear yourself a moment late.';
+      if (st === 'done') { v.status = 'Done. Samt knew your voice and turned the echo on.'; v.main = next; v.alt = { label: 'Hear it again', run: openEchoTest }; }
+      else todo({ label: 'Start the echo test', run: openEchoTest, off: !modelOk });
+    } else if (id === 'others') {
+      v.body = "Let someone else talk near you for about 30 seconds while you stay quiet: a person, or a TV or another phone playing a video. Men's voices are the hardest test, so use one if you can.";
+      if (st === 'done') { const s = secs(profile.othSegs); v.status = s ? `Done. Samt knows ${s} seconds of other voices.` : 'Done.'; v.main = next; v.alt = { label: 'Add more', run: () => teachVoice('oth') }; }
+      else todo({ label: 'Start', run: () => teachVoice('oth'), off: !modelOk });
+    } else if (id === 'check') {
+      v.body = 'Two rounds of about 20 seconds: first you talk, then someone else talks while you stay quiet. No echo plays. Samt counts how often it got each right.';
+      if (st === 'done') { v.res = wiz.check; Object.assign(v, checkAdvice(wiz.check)); }
+      else todo({ label: 'Start the check', run: startCheck, off: !modelOk });
+    } else {
+      v.body = 'Say each greeting, thanks and short answer 3 times, about 2 minutes. Samt then lets them through with no echo.';
+      const missing = book.phrases.filter(p => p.takes.length < 2).map(p => p.id);
+      if (st === 'done') { v.status = `Done. ${phrasesReady()} of ${book.phrases.length} phrases recorded.`; v.main = next; if (missing.length) v.alt = { label: 'Record the missing ones', run: () => recordPhrases(missing) }; }
+      else todo({ label: 'Record the phrases', run: () => recordPhrases(missing.length ? missing : book.phrases.map(p => p.id)) });
+    }
+    return v;
+  }
+  function sumValue(id, st) {
+    if (st !== 'done') return st === 'skipped' ? 'Skipped' : 'Not done';
+    if (id === 'voice') return `${Math.round(frames(profile.meSegs) / 100)} s`;
+    if (id === 'others') { const s = Math.round(frames(profile.othSegs) / 100); return s ? `${s} s` : 'Done'; }
+    if (id === 'check') { const c = wiz.check; return `You ${c.you[0]}/${c.you[1]} · Others ${c.oth[0]}/${c.oth[1]}`; }
+    if (id === 'phrases') return `${phrasesReady()} of ${book.phrases.length}`;
+    return 'Done';
+  }
+  function renderWizard() {
+    if (view !== 'wizard') return;
+    const states = WSTEPS.map(s => stepState(s.id)), sum = wizAt >= WSTEPS.length, idle = !busy;
+    $('wzBar').querySelectorAll('i').forEach((el, i) => { el.dataset.s = i === wizAt ? 'now' : states[i]; });
+    $('wzCard').hidden = sum; $('wzSum').hidden = !sum; $('wzFinish').hidden = !sum; $('wzFinish').disabled = !idle;
+    $('wzPrev').hidden = wizAt === 0; $('wzPrev').disabled = !idle;
+    if (sum) {
+      $('wzSumTitle').textContent = wizSettled() ? 'All set' : 'Your setup';
+      const box = $('wzSumList'); box.textContent = '';
+      WSTEPS.forEach((s, i) => {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'row'; b.disabled = !idle;
+        const t = document.createElement('span'); t.className = 'rt'; t.textContent = s.title;
+        const val = document.createElement('span'); val.className = 'rv'; val.textContent = sumValue(s.id, states[i]);
+        b.append(t, val, chevron()); b.onclick = () => wizGo(i); box.appendChild(b);
+      });
+      $('wzNext').hidden = true; return;
+    }
+    const s = WSTEPS[wizAt], v = stepView(s.id, states[wizAt]);
+    const put = (id, t) => { const el = $(id); if (el.textContent !== t) el.textContent = t; }; // the card is a live region: say only what changed
+    put('wzCount', `Step ${wizAt + 1} of ${WSTEPS.length}` + (s.optional ? ', optional' : ''));
+    put('wzStepTitle', s.title); put('wzBody', v.body);
+    $('wzStatus').hidden = !v.status; put('wzStatus', v.status); $('wzStatus').classList.toggle('good', !!v.good);
+    const r = v.res; $('wzRes').hidden = !r;
+    if (r) {
+      const pc = (a, b) => b ? Math.round(100 * a / b) : 0;
+      put('wzYou', `${r.you[0]} of ${r.you[1]} times`); $('wzYouBar').style.width = pc(r.you[0], r.you[1]) + '%';
+      put('wzOth', `${r.oth[0]} of ${r.oth[1]} times`); $('wzOthBar').style.width = pc(r.oth[0], r.oth[1]) + '%';
+    }
+    wizMain = v.main; $('wzMain').hidden = !v.main; if (v.main) { put('wzMain', v.main.label); $('wzMain').disabled = !idle || !!v.main.off; }
+    wizAlt = v.alt; $('wzAlt').hidden = !v.alt; if (v.alt) { put('wzAlt', v.alt.label); $('wzAlt').disabled = !idle; }
+    const nx = $('wzNext'); nx.hidden = !(v.skip || v.next); put('wzNext', v.skip ? 'Skip' : 'Next'); nx.disabled = !idle;
+  }
 
   /* ---------- rendering ---------- */
   function setBusy(b) { busy = b; render(); }
@@ -2729,7 +2972,7 @@ registerProcessor('samt-tap', SamtTap);
     const paused = !!(session && session.paused), test = !!(session && session.mode === 'test');
     // Home: teach your voice first, or start a session
     $('setupCard').hidden = taught; $('readyCard').hidden = !taught;
-    $('setupStart').disabled = !idle || !modelOk;
+    $('setupStart').disabled = !idle; // the first step waits for the voice model itself
     $('setupModel').hidden = modelOk; if (!modelOk) $('setupModel').textContent = 'Getting the voice model ready: ' + $('modelStatus').textContent.toLowerCase();
     $('go').disabled = $('test').disabled = !idle || !taught || !modelOk;
     $('go').textContent = settings.kind === 'conversation' ? 'Start conversation' : 'Start silence';
@@ -2743,6 +2986,9 @@ registerProcessor('samt-tap', SamtTap);
     $('resume').hidden = !paused; $('pass').hidden = paused || test;
     $('stopText').textContent = test ? 'Stop test' : 'Hold to stop'; $('stop').classList.toggle('hold', !test); $('stop').querySelector('.ring').style.display = test ? 'none' : '';
     renderPhrases();
+    // setup, step by step
+    $('wizStatus').textContent = wizStatusText(); $('toWizard').disabled = !idle;
+    renderWizard();
   }
   function renderPhrases() {
     const box = $('phraseList'), groups = [];
@@ -2777,12 +3023,15 @@ registerProcessor('samt-tap', SamtTap);
     $('test').onclick = () => startSession('test');
     $('resume').onclick = resumeAudio;
     wireHoldStop();
-    $('setupStart').onclick = () => { wantEchoTest = true; teachVoice('me'); };
-    $('teachVoice').onclick = () => {
-      if (!voice || !voice.ready) { wantEchoTest = true; teachVoice('me'); return; }
-      ask({ title: 'Your voice', msg: `Samt knows ${Math.round(frames(profile.meSegs) / 100)} seconds of your voice. If you start over, the old voice keeps working until the new one is saved.`,
-        actions: [{ label: 'Add more of your voice', run: () => teachVoice('me') }, { label: 'Start over', run: () => { wantEchoTest = true; teachVoice('me', { fresh: true }); } }, { label: 'Hear the echo test', run: openEchoTest }] });
-    };
+    $('setupStart').onclick = () => openWizard('home');
+    $('toWizard').onclick = () => openWizard('settings');
+    $('teachVoice').onclick = voiceChoices;
+    // the step-by-step setup's buttons (each step decides what its main and second button do)
+    $('wzMain').onclick = () => { if (wizMain && !wizMain.off) wizMain.run(); };
+    $('wzAlt').onclick = () => { if (wizAlt) wizAlt.run(); };
+    $('wzNext').onclick = () => { const s = WSTEPS[wizAt]; if (s && s.skip && stepState(s.id) === 'todo') { wiz.skip[s.id] = true; saveWiz(); } wizGo(wizAt + 1); };
+    $('wzPrev').onclick = () => wizGo(wizAt - 1);
+    $('wzFinish').onclick = () => { wiz.done = true; saveWiz(); render(); goBack(); };
     $('recResume').onclick = async () => {
       if (!rec || !rec.paused) return;
       mic.prime(); // inside the tap
@@ -2884,7 +3133,7 @@ registerProcessor('samt-tap', SamtTap);
     stepper('vol', 'dVolDown', 'dVolUp', 'dVolOut', 10, 10, 100, v => v + '%', volApply); // the same volume, inside a session
     stepper('limit', 'limitDown', 'limitUp', 'limitOut', 5, 5, 60, v => v + ' s', () => { if (ctrl && session && session.kind === 'conversation') Object.assign(ctrl.p, convParams()); render(); });
     const LSB = [{ v: -1, label: 'Looser' }, { v: 0, label: 'Balanced' }, { v: 1, label: 'Stricter' }];
-    seg($('strictSeg'), LSB, settings.strict, v => { settings.strict = v; saveSettings(); if (voice) voice.strict = strictValue(); settingsValues(); });
+    strictCtl = seg($('strictSeg'), LSB, settings.strict, v => { settings.strict = v; saveSettings(); if (voice) voice.strict = strictValue(); settingsValues(); renderWizard(); });
     seg($('psensSeg'), LSB, settings.psens, v => { settings.psens = v; saveSettings(); book.sens = phraseSens(); settingsValues(); });
     seg($('themeSeg'), [{ v: 'auto', label: 'Auto' }, { v: 'day', label: 'Day' }, { v: 'night', label: 'Night' }], themePref(), v => { try { localStorage.setItem('samt.theme', v); } catch (e) {} applyTheme(); });
     $('backupBtn').onclick = backup;
@@ -2895,6 +3144,7 @@ registerProcessor('samt-tap', SamtTap);
       actions: [{ label: 'Erase everything', danger: true, run: async () => {
         await Promise.all(['profile', 'voice', 'phrases'].map(k => store.del(K(k))));
         profile = { meSegs: [], othSegs: [], adaptSegs: [] }; voice = null; book = new PhraseBook(); lastRec = null;
+        wiz = freshWiz(); saveWiz(); // setup starts again from step 1
         renderLast(); live('off', 'Teach Samt your voice to begin'); render(); toast('Erased on this device.');
       } }]
     });
@@ -2916,6 +3166,7 @@ registerProcessor('samt-tap', SamtTap);
     // fetch the Amiri fonts once the page has settled, so a session's first reminder doesn't flash in another font
     setTimeout(() => { try { for (const f of ['"Amiri Quran"', 'Amiri', '"Samt Arabic"']) document.fonts.load('26px ' + f, 'ق').catch(() => {}); } catch (e) {} }, 2000);
     debug.history = () => history; debug.shared = shared; debug.view = () => view; debug.trouble = onTrouble;
+    debug.wiz = () => ({ at: wizAt, states: WSTEPS.map(s => stepState(s.id)), check: wiz.check, done: wiz.done, strict: settings.strict });
     if (FAKE) { debug.feed = async (name, url) => { const b = await (await fetch(url)).arrayBuffer(); return mic.play(name, new Float32Array(b)); }; debug.ensureEngine = ensureMic; }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();

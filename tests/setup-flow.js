@@ -2,8 +2,9 @@
 // microphone (?fakemic=1) and feeds it the recordings in tests/audio/. Writes screenshots and the backup file that
 // tests/features.js restores to tests/out/.
 // End-to-end run of the built page in a real browser engine (chromium | webkit) with the fake mic, through the four
-// states: setup (reading, a pause mid-reading, the echo test), other voices and phrases from Settings, a test session,
-// a real session (Details, a correction, hold to stop), the end sheet, backup and restore, erase, layout at five widths.
+// states: setup step by step (the reading with a pause mid-reading, the echo test, other voices, the check and its
+// advice, the phrases, the summary), the setup and the phrases again from Settings, a test session, a real session
+// (Details, a correction, hold to stop), the end sheet, backup and restore, erase, layout at five widths.
 const pw = (() => { try { return require('playwright-core'); } catch (e) { return require('/opt/node-tools/node_modules/playwright-core'); } })(); const { spawn } = require('child_process'); const fs = require('fs'), path = require('path');
 const [engine = 'webkit', mode = 'light', speed = '25'] = process.argv.slice(2);
 const ROOT = path.resolve(__dirname, '..'), OUT = path.join(__dirname, 'out'), sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -32,10 +33,16 @@ const PORT = 8770 + Math.floor(Math.random() * 100);
     await page.waitForFunction(() => window.SamtDebug && SamtDebug.feed, null, { timeout: 20000 });
     const feed = n => page.evaluate(x => SamtDebug.feed(x, '/tests/audio/' + x + '.f32'), n);
     const idle = () => page.waitForFunction(() => !document.querySelector('#recordAll').disabled, null, { timeout: 300000 });
-    out(`first open: setup card ${await page.isVisible('#setupCard')}, Start shown ${await page.isVisible('#go')}, quick tools ${await page.isVisible('#openCards')}`);
-    // 1. setup: the reading, with a pause (a call) part-way, then the echo test
+    out(`first open: setup card ${await page.isVisible('#setupCard')} ("${await page.textContent('#setupTitle')}"), Start shown ${await page.isVisible('#go')}, quick tools ${await page.isVisible('#openCards')}`);
+    // 1. setup, step by step, from the first open's card: the reading (with a pause part-way), the echo test, other
+    //    voices, the check (two rounds, then the advice) and the phrases, then the summary
+    const step = async () => `${await page.textContent('#wzCount')}: ${await page.textContent('#wzStepTitle')}`;
+    const wzIdle = () => page.waitForFunction(() => !document.querySelector('#wzMain').disabled && document.querySelector('#recPanel').hidden, null, { timeout: 300000 });
+    const goNext = async () => { if (await page.isVisible('#wzMain') && (await page.textContent('#wzMain')) === 'Next') await page.click('#wzMain'); else await page.click('#wzNext'); await sleep(250); };
+    await page.click('#setupStart'); await sleep(300);
+    out(`wizard: view ${await view()} | ${await step()} | main "${await page.textContent('#wzMain')}" | Skip shown ${await page.isVisible('#wzNext')} | Previous shown ${await page.isVisible('#wzPrev')}`);
     let t0 = Date.now();
-    await page.click('#setupStart'); await page.waitForSelector('#recPanel:not([hidden])'); await sleep(300);
+    await page.click('#wzMain'); await page.waitForSelector('#recPanel:not([hidden])'); await sleep(300);
     const half = page.evaluate(() => SamtDebug.feed('enroll_me', '/tests/audio/enroll_me.f32'));
     await page.waitForFunction(() => /[1-9]\d* of 45/.test(document.querySelector('#recHint').textContent), null, { timeout: 60000 });
     await page.evaluate(() => SamtDebug.trouble('interrupted'));
@@ -43,23 +50,66 @@ const PORT = 8770 + Math.floor(Math.random() * 100);
     await page.click('#recResume'); await sleep(200); out('after Resume: ' + await page.textContent('#recHint'));
     await half;
     await page.waitForSelector('#recDone:not([disabled])'); await page.click('#recDone');
-    await page.waitForSelector('#testPanel.show', { timeout: 300000 });
-    out(`voice taught in ${Date.now() - t0} ms; the echo test opened`);
+    await page.waitForFunction(() => SamtDebug.wiz().states[0] === 'done' && !document.querySelector('#wzMain').disabled, null, { timeout: 300000 });
+    out(`step 1 in ${Date.now() - t0} ms: ${await page.textContent('#wzStatus')} | main "${await page.textContent('#wzMain')}" | the echo test opened by itself: ${await page.isVisible('#testPanel')}`);
+    await goNext(); out(`${await step()} | Skip shown ${await page.isVisible('#wzNext')}`);
+    await page.click('#wzMain'); await page.waitForSelector('#testPanel.show');
     await page.click('#testStart'); await sleep(300); await feed('enroll2_me');
     await page.waitForFunction(() => !document.querySelector('#testDone').hidden || !document.querySelector('#testMore').hidden || document.querySelector('#testStart').textContent === 'Try again', null, { timeout: 60000 });
     out('echo test: ' + await page.textContent('#testText'));
     await page.click(await page.isVisible('#testDone') ? '#testDone' : '#testSkip'); await page.waitForSelector('#testPanel', { state: 'hidden' });
-    out(`after setup: ready card ${await page.isVisible('#readyCard')}, setup card ${await page.isVisible('#setupCard')}`);
-    // 2. other voices and the phrases, from Settings
-    await page.click('#toSettings'); await sleep(200);
-    t0 = Date.now(); await page.click('#teachOthers'); await sleep(300); await feed('enroll_oth');
-    await page.waitForSelector('#recDone:not([disabled])'); await page.click('#recDone'); await idle();
-    out(`others taught in ${Date.now() - t0} ms: ${await page.textContent('#othStatus')}`);
-    await page.click('#toPhrases'); await sleep(200);
-    t0 = Date.now(); await page.click('#recordAll'); await sleep(300);
+    out(`step 2: ${await page.isVisible('#wzStatus') ? await page.textContent('#wzStatus') : '(no status)'}`);
+    await goNext(); out(await step());
+    t0 = Date.now(); await page.click('#wzMain'); await sleep(300); await feed('enroll_oth');
+    await page.waitForSelector('#recDone:not([disabled])'); await page.click('#recDone'); await wzIdle();
+    out(`step 3 in ${Date.now() - t0} ms: ${await page.textContent('#wzStatus')}`);
+    await goNext(); out(`${await step()} | main "${await page.textContent('#wzMain')}"`);
+    // the check's voices come from the 5-minute test stream, so none of them was used to teach Samt: your talk, then
+    // two men's talk (the hard case for Light)
+    const clip = (roles, maxSec) => page.evaluate(async ([roles, maxSec]) => {
+      const tl = await (await fetch('/tests/audio/test.json')).json(), x = new Float32Array(await (await fetch('/tests/audio/test.f32')).arrayBuffer());
+      const parts = [], gap = new Float32Array(14400); let sec = 0;
+      for (const c of tl.filter(c => roles.includes(c.role) && c.kind === 'test_talk')) { if (sec >= maxSec) break; parts.push(x.subarray(Math.round(c.start * 16000), Math.round(c.end * 16000)), gap); sec += c.end - c.start; }
+      const y = new Float32Array(parts.reduce((a, p) => a + p.length, 0)); let o = 0; for (const p of parts) { y.set(p, o); o += p.length; }
+      return SamtDebug.engine.play('check', y);
+    }, [roles, maxSec]);
+    const runCheck = async () => {
+      await page.waitForSelector('#recPanel:not([hidden])'); await sleep(300);
+      await clip(['me'], 19); await sleep(1500);
+      if (await page.isEnabled('#recDone') && (await page.textContent('#recDone')) === 'Done') await page.click('#recDone');
+      await page.waitForFunction(() => document.querySelector('#recDone').textContent === 'Start', null, { timeout: 60000 });
+      out(`check, between the rounds: "${await page.textContent('#recTitle')}" | ${await page.textContent('#recHint')}`);
+      await page.click('#recDone'); await sleep(300);
+      await clip(['man_typ', 'man_hard'], 18); await sleep(1500);
+      if (await page.isVisible('#recPanel') && await page.isEnabled('#recDone')) await page.click('#recDone');
+      await page.waitForSelector('#recPanel', { state: 'hidden', timeout: 60000 }); await wzIdle();
+      return `caught you ${await page.textContent('#wzYou')} | ignored others ${await page.textContent('#wzOth')} | "${await page.textContent('#wzStatus')}" | main "${await page.textContent('#wzMain')}"`;
+    };
+    await page.evaluate(v => { SamtDebug.engine.speed = v; }, mode === 'neural' ? 1 : 4); // the neural checks need real time
+    const checkLog = async () => (await page.evaluate(() => SamtDebug.checkLog)).map(s => `${s.round ? 'O' : 'Y'}${s.sec}s:${s.echoed ? (s.echoAtEnd ? 'E' : 'e') : '-'}${s.speaker[0]}`).join(' ');
+    t0 = Date.now(); await page.click('#wzMain'); let r = await runCheck(); out(`step 4 in ${Date.now() - t0} ms: ${r}`);
+    out('  stretches (Y you, O others; E echo to the end, e echo then off, - none; speaker m/o/u): ' + await checkLog());
+    if ((await page.textContent('#wzMain')).startsWith('Make it')) { // the one-tap fix: Matching changes, the check runs again
+      t0 = Date.now(); await page.click('#wzMain'); r = await runCheck();
+      out(`after the fix (Matching ${await page.textContent('#matchStatus')}) in ${Date.now() - t0} ms: ${r}`);
+      out('  stretches: ' + await checkLog());
+    }
+    await page.evaluate(v => { SamtDebug.engine.speed = v; }, +speed);
+    await goNext(); out(await step());
+    t0 = Date.now(); await page.click('#wzMain'); await sleep(300);
     for (const id of ['hi', 'hello', 'how_are_you', 'im_good', 'salam', 'salam_reply', 'thank_you', 'jazak', 'welcome', 'yes', 'no', 'okay']) await feed('phr_' + id);
     await idle(); await page.waitForSelector('#recPanel', { state: 'hidden' });
-    out(`phrases in ${Date.now() - t0} ms: ${await page.textContent('#phrStatus')}`);
+    out(`step 5 in ${Date.now() - t0} ms: ${await page.textContent('#wzStatus')}`);
+    await goNext();
+    out(`summary: ${await page.textContent('#wzSumTitle')} | ${(await page.$$eval('#wzSumList .row', rs => rs.map(r => r.querySelector('.rt').textContent + ': ' + r.querySelector('.rv').textContent))).join(' · ')}`);
+    await page.click('#wzFinish'); await sleep(300);
+    out(`Finish goes to: ${await view()} | ready card ${await page.isVisible('#readyCard')}, setup card ${await page.isVisible('#setupCard')}`);
+    // 2. the same places from Settings: the setup again (it opens on the summary), and the phrases page
+    await page.click('#toSettings'); await sleep(200);
+    out(`Settings: step-by-step setup "${await page.textContent('#wizStatus')}" | voice ${await page.textContent('#voiceStatus')} | others ${await page.textContent('#othStatus')}`);
+    await page.click('#toWizard'); await sleep(300); out(`setup from Settings opens on: ${await page.textContent('#wzSumTitle')} (Back says "${await page.textContent('#wzBack')}")`);
+    await back(); out('Back from the setup goes to: ' + await view());
+    await page.click('#toPhrases'); await sleep(200); out('phrases: ' + await page.textContent('#phrStatus'));
     await back(); out('Back from Phrases goes to: ' + await view()); await back(); out('then to: ' + await view());
     await reopen();
     if (mode === 'neural') await page.waitForFunction(() => document.querySelector('#modelStatus').textContent.startsWith('Ready'), null, { timeout: 180000 });
@@ -99,18 +149,21 @@ const PORT = 8770 + Math.floor(Math.random() * 100);
     await page.click('#resetAll'); await page.waitForSelector('#actSheet.show'); out('erase sheet: ' + (await page.textContent('#actTitle'))); await page.click('#actCancel'); await sleep(400);
     await page.click('#dataDone'); await page.waitForSelector('#dataPanel', { state: 'hidden' });
     await back();
-    // 6. layout at the five widths, Home / Settings / Progress
+    // 6. layout at the five widths, Home / Settings / Progress / the setup (its check step, with the result)
     for (const [w, h, theme] of [[390, 844, 'day'], [744, 1133, 'night'], [834, 1194, 'day'], [1024, 1366, 'night'], [1440, 900, 'day']]) {
       await page.setViewportSize({ width: w, height: h });
       await page.evaluate(t => { localStorage.setItem('samt.theme', t); document.body.classList.toggle('theme-dark', t === 'night'); }, theme);
       const res = [];
-      for (const v of ['home', 'settings', 'progress']) {
-        if (v !== 'home') await page.click(v === 'settings' ? '#toSettings' : '#toProgress');
+      for (const v of ['home', 'settings', 'progress', 'wizard']) {
+        if (v === 'wizard') { await page.click('#toSettings'); await sleep(200); await page.click('#toWizard'); await sleep(200); await page.click('#wzSumList .row:nth-child(4)'); }
+        else if (v !== 'home') await page.click(v === 'settings' ? '#toSettings' : '#toProgress');
         await sleep(300);
         if (w === 390 || w === 1024) await page.screenshot({ path: path.join(OUT, `${engine}_${mode}_${v}_${w}_${theme}.png`), fullPage: true });
         const over = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
         const tall = await page.evaluate(() => Math.round(document.documentElement.scrollHeight / innerHeight * 10) / 10);
-        res.push(`${v} overflow ${over}px, ${tall} screens`);
+        const content = await page.evaluate(() => Math.round(document.querySelector('.win').getBoundingClientRect().bottom + 32));
+        res.push(`${v} overflow ${over}px, ${tall} screens (content ${content}px)`);
+        if (v === 'wizard') await back();
         if (v !== 'home') await back();
       }
       out(`${w}px ${theme}: ${res.join(' | ')}`);
