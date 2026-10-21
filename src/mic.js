@@ -95,6 +95,18 @@ registerProcessor('samt-tap', SamtTap);
       g.cancelScheduledValues(t); g.setValueAtTime(g.value, t);
       g.setTargetAtTime(open ? Math.min(1, this.vol) : 0, t, open ? 0.008 : 0.025);
     }
+    /* The nudge: two soft notes, rising, in the headphones. */
+    chime() {
+      const ctx = this.ctx; if (!ctx || ctx.state !== 'running') return;
+      const t = ctx.currentTime + 0.02, peak = 0.16 * Math.max(0.3, Math.min(1, this.vol));
+      [[660, 0], [880, 0.17]].forEach(([f, at]) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'sine'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t + at); g.gain.exponentialRampToValueAtTime(peak, t + at + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + at + 0.15);
+        o.connect(g); g.connect(ctx.destination); o.start(t + at); o.stop(t + at + 0.17);
+        o.onended = () => { try { o.disconnect(); g.disconnect(); } catch (e) {} };
+      });
+    }
     setDelay(sec) { this.delaySec = sec; if (this.delay) this.delay.delayTime.setTargetAtTime(sec, this.ctx.currentTime, 0.02); }
     setVolume(v) { this.vol = Math.min(1, v); if (this.open) this.setEcho(true); }
     _release() {
@@ -138,6 +150,7 @@ registerProcessor('samt-tap', SamtTap);
     async resume() { return true; }
     trackLive() { return true; }
     setEcho(open) { this.open = open; this.echoLog.push([+this.t.toFixed(2), open]); }
+    chime() { this.echoLog.push([+this.t.toFixed(2), 'chime']); }
     setDelay() {} setVolume() {}
     stop() { /* the test keeps one fake mic for the whole run */ }
   }

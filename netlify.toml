@@ -3,6 +3,11 @@
 [build]
   publish = "site"
 
+# One function, /api/summary (netlify/functions/summary.mts): Claude's end-of-session note, through Netlify AI Gateway.
+# Netlify installs package.json's dependencies for it; the pages themselves still need no build.
+[functions]
+  directory = "netlify/functions"
+
 # The voice model is 6.4 MB and changes rarely: let browsers keep it for a week.
 [[headers]]
   for = "/neural/voice-model.onnx"

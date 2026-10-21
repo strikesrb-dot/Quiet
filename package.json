@@ -1,0 +1,12 @@
+{
+  "name": "samt",
+  "private": true,
+  "type": "module",
+  "description": "Samt, a quiet-time aid. The site is static (site/); one Netlify Function asks Claude for an end-of-session summary.",
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.131.0"
+  },
+  "devDependencies": {
+    "@netlify/functions": "6.0.2"
+  }
+}

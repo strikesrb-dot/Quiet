@@ -140,20 +140,30 @@
   }
 
   class Controller {
-    constructor({ listener, voice, book, onEcho, onEvent, params }) {
-      this.L = listener; this.voice = voice; this.book = book; this.onEcho = onEcho || (() => {}); this.onEvent = onEvent || (() => {});
-      this.p = Object.assign({ minTalk: 50, contGap: 120, recheckWin: voice.kind === 'neural' ? 100 : 60 }, params || {});
+    /* params: limit = frames of talk allowed in one turn before the echo (0 = right away); interrupt = echo at once when
+       you talk over someone; nudge = a soft tone first, then the echo nudgeGrace frames of talk later. */
+    constructor({ listener, voice, book, onEcho, onEvent, onNudge, params }) {
+      this.L = listener; this.voice = voice; this.book = book; this.onEcho = onEcho || (() => {}); this.onEvent = onEvent || (() => {}); this.onNudge = onNudge || (() => {});
+      this.p = Object.assign({ minTalk: 50, contGap: 120, recheckWin: voice.kind === 'neural' ? 100 : 60, limit: 0, interrupt: false, nudge: false, nudgeGrace: 250, turnGap: 150 }, params || {});
       this.tmp = new Float32Array(D);
     }
     start(mode) {
       this.mode = mode; this.seg = null; this.lastEnd = -1e9; this.lastEcho = false; this.segId = 0; this.history = [];
-      this.counts = { talk: 0, talkSec: 0, pass: 0, short: 0, other: 0 };
+      this.counts = { talk: 0, talkSec: 0, pass: 0, short: 0, other: 0, interrupt: 0, nudge: 0, freePass: 0, meSec: 0, otherSec: 0, talkTime: 0 };
+      this.turn = { talk: 0, lastMe: -1e9, otherAfter: false, nudged: false }; this.passUntil = -1; this.lastMeEnd = this.L.fs.nFrames; this.lastOtherEnd = -1e9;
       this.spotter = new Spotter(this.book ? this.book.templates() : [], D);
       this.adaptQueue = []; this.L.consumer = this; this.on = true; this._state('listening');
     }
     stop() { if (this.seg && this.seg.echo) this._echo(false); this.on = false; this.seg = null; }
     /* The mic went away mid-speech: end the current segment now. */
     cut() { const seg = this.seg; if (!seg) return; seg.end = Math.max(seg.start, seg.next - 1); this._finish(); }
+    /* Talk freely for a while: no echo and no nudge until it runs out. */
+    pass(sec) {
+      this.passUntil = this.L.fs.nFrames + Math.round(sec * 100); this.counts.freePass++;
+      if (this.seg && this.seg.echo) { this.seg.echo = false; this.counts.talk--; this.counts.talkSec += Math.max(0, this.L.fs.nFrames - this.seg.echoAt) / 100; this._echo(false); }
+      this.lastEcho = false;
+    }
+    passLeft() { return Math.max(0, (this.passUntil - this.L.fs.nFrames) / 100); }
     _state(state, extra) { this.onEvent(Object.assign({ type: 'state', state }, extra || {})); }
     _echo(open) { if (this.mode === 'silence') this.onEcho(open); }
     onVad(ev) {
@@ -167,14 +177,16 @@
     }
     _onset(s) {
       const seg = this.seg = { id: ++this.segId, start: s, next: s, end: null, speaker: 'unknown', tentative: false, pending: false, lastCheck: s, echo: false, uncovered: false,
-        cursor: s, obs: [], passes: [], scores: [], margins: [], embs: [], neg: 0, pos: 0 };
+        cursor: s, obs: [], passes: [], scores: [], margins: [], embs: [], neg: 0, pos: 0, since: s, cred: { me: 0, other: 0 }, otherHits: 0, counted: false };
       this.spotter.reset();
-      if (this.lastEcho && s - this.lastEnd <= this.p.contGap) { seg.speaker = 'me'; seg.tentative = true; seg.uncovered = true; this._open(s); }
+      const t = this.turn;
+      if (s - t.lastMe > this.p.turnGap || t.otherAfter) this._newTurn();
+      if (this.lastEcho && s - this.lastEnd <= this.p.contGap && s >= this.passUntil) { seg.speaker = 'me'; seg.tentative = true; seg.uncovered = true; this._open(s); }
       else this._state('holding');
     }
     _step(f) {
       const seg = this.seg, v = this.voice;
-      if (!seg.echo && seg.speaker !== 'other') {
+      if (!seg.echo && seg.speaker !== 'other' && !seg.noSpot) {
         if (this.spotter.T.length && !seg.obs.length && !this.L.isSpeech(f)) seg.cursor = f + 1; // skip pauses before the next phrase
         else if (this.spotter.T.length) {
           const o = this.book.norm(this.L.fs.vec(f, this.tmp));
@@ -186,7 +198,37 @@
         if ((seg.speaker === 'unknown' || seg.tentative) && len >= v.minFrames) this._verdict(seg, seg.start, f);
         else if (seg.speaker !== 'unknown' && !seg.tentative && f - seg.lastCheck >= v.recheck) this._verdict(seg, Math.max(seg.start, f - this.p.recheckWin + 1), f);
       }
-      if (!seg.echo && seg.speaker === 'me' && seg.uncovered) this._open(f);
+      if (seg.speaker === 'me' && seg.uncovered) {
+        // talk the phrases don't explain counts toward the turn's limit and the day's talk time (from where it began)
+        const add = seg.counted ? 1 : Math.max(1, f - seg.cursor + 1); seg.counted = true;
+        if (f >= this.passUntil) { this.turn.talk += add; seg.turnF = (seg.turnF || 0) + add; }
+        this.counts.talkTime += add / 100; seg.talkF = (seg.talkF || 0) + add;
+      }
+      this._decide(f);
+    }
+    _newTurn() { this.turn = { talk: 0, lastMe: this.turn.lastMe, otherAfter: false, nudged: false }; }
+    /* Someone else took over from you, or you took over from them, partway through one stretch of sound. */
+    _flip(seg, to, at) {
+      const from = seg.speaker;
+      if (from === 'me' || from === 'other') seg.cred[from] += Math.max(0, at - seg.since);
+      seg.since = Math.max(seg.since, at); seg.speaker = to;
+    }
+    /* When your talking turns on the echo: at once, after the turn's limit, or after a nudge. */
+    _decide(f) {
+      const seg = this.seg, t = this.turn, p = this.p;
+      if (seg.echo || seg.speaker !== 'me' || !seg.uncovered || f < this.passUntil) return;
+      if (seg.interrupt && p.interrupt) { this._open(f); return; }
+      if (p.nudge) {
+        const at = Math.max(0, p.limit - p.nudgeGrace);
+        if (!t.nudged) { if (t.talk >= at) { t.nudged = true; this.counts.nudge++; this.onEvent({ type: 'nudge' }); if (this.mode === 'silence') this.onNudge(); } return; }
+        if (t.talk >= Math.max(p.limit, at + p.nudgeGrace)) this._open(f);
+        return;
+      }
+      if (t.talk >= p.limit) this._open(f);
+    }
+    _interrupted(seg) {
+      if (seg.interrupt) return;
+      seg.interrupt = true; this.counts.interrupt++; this.onEvent({ type: 'interrupt' });
     }
     _phrase(r, f) {
       const seg = this.seg;
@@ -195,7 +237,7 @@
           const c = r.complete, rest = seg.obs.slice(c.end + 1);
           seg.passes.push(c.phrase); this.counts.pass++;
           this.onEvent({ type: 'phrase', phrase: c.phrase, ratio: c.ratio });
-          seg.cursor += c.end + 1; seg.obs = []; seg.free = 0; seg.uncovered = false; this.spotter.reset();
+          seg.cursor += c.end + 1; seg.obs = []; seg.free = 0; seg.uncovered = false; seg.counted = false; this.spotter.reset();
           if (!rest.length) return;
           for (const o of rest) { seg.obs.push(o); r = this.spotter.push(o); }
           continue;
@@ -214,30 +256,63 @@
     _verdict(seg, a, b) {
       seg.pending = true; seg.lastCheck = b;
       const v = this.voice;
-      if (v.kind === 'light') { const sub = this.L.segment(a, b); this._onVerdict(seg, v.score(sub, 0, sub.n)); }
-      else { const smp = this.L.samples(a, b); this.pendingP = v.scoreSamples(smp).then(r => { this.pendingP = null; this._onVerdict(seg, r); }, () => { this.pendingP = null; seg.pending = false; }); }
+      if (v.kind === 'light') { const sub = this.L.segment(a, b); this._onVerdict(seg, v.score(sub, 0, sub.n), a); }
+      else { const smp = this.L.samples(a, b); this.pendingP = v.scoreSamples(smp).then(r => { this.pendingP = null; this._onVerdict(seg, r, a); }, () => { this.pendingP = null; seg.pending = false; }); }
     }
-    _onVerdict(seg, r) {
+    _onVerdict(seg, r, a) {
       seg.pending = false; if (!r) return;
       seg.scores.push(r.score); seg.margins.push(r.margin); if (r.emb) seg.embs.push(r.emb);
       this.onEvent({ type: 'verdict', isMe: r.isMe, score: r.score, margin: r.margin });
       if (seg !== this.seg) return; // segment already ended
       if (seg.speaker === 'unknown' || seg.tentative) {
         seg.tentative = false; seg.speaker = r.isMe ? 'me' : 'other';
-        if (!r.isMe) { if (seg.echo) this._close(); this._state('other'); }
-      } else if (r.isMe) { seg.neg = 0; if (seg.speaker === 'other' && ++seg.pos >= 2) { seg.speaker = 'me'; seg.uncovered = true; } }
-      else { seg.pos = 0; if (seg.speaker === 'me' && ++seg.neg >= 2) { seg.speaker = 'other'; if (seg.echo) this._close(); this._state('other'); } }
+        if (!r.isMe) { seg.otherHits = r.margin <= -1 ? 1 : 0; seg.need = 2; if (seg.echo) this._close(); this._state('other'); } // only a clear 'someone else' counts
+      } else if (r.isMe) {
+        seg.neg = 0;
+        if (seg.speaker === 'other') {
+          if (++seg.pos === 1) seg.posFrom = a;
+          // after a clear 'someone else', the light model needs a third check that it is you now (its checks are half as long)
+          if (seg.pos >= (seg.otherHits >= 2 && this.voice.kind !== 'neural' ? 3 : 2)) {
+            // someone else was clearly talking (two checks) and you came in over them: that is talking over someone
+            const over = seg.otherHits >= (seg.need || 2);
+            this._flip(seg, 'me', seg.posFrom); this._newTurn();
+            seg.cursor = seg.since; seg.uncovered = true; seg.counted = false; seg.noSpot = true; // a second or more of you: not a short phrase
+            if (over) this._interrupted(seg);
+          }
+        }
+      } else {
+        seg.pos = 0;
+        if (seg.speaker === 'other') { if (r.margin <= -1) seg.otherHits++; }
+        else if (seg.speaker === 'me') {
+          if (++seg.neg === 1) seg.negFrom = a;
+          // a stretch that began as you and turned into someone else: it takes 3 more clear checks of them before
+          // coming back in counts as talking over them (a short wobble of the model is not)
+          if (seg.neg >= 2) { this._flip(seg, 'other', seg.negFrom); seg.otherHits = 0; seg.need = 3; this.turn.otherAfter = true; if (seg.echo) this._close(); this._state('other'); }
+        }
+      }
     }
     _finish() {
       const seg = this.seg, e = seg.end;
       while (seg.next <= e) this._step(seg.next++);
+      // the frames after the last word (the pause that ended the stretch) were counted as talk while it ran: take them back
+      const over = Math.max(0, seg.next - 1 - e);
+      if (over && seg.counted && seg.speaker === 'me') {
+        const d = Math.min(over, seg.talkF || 0), dt = Math.min(over, seg.turnF || 0);
+        this.counts.talkTime = Math.max(0, this.counts.talkTime - d / 100); this.turn.talk = Math.max(0, this.turn.talk - dt);
+      }
       const n = e - seg.start + 1;
       if (seg.speaker === 'unknown' && n >= 25 && this.voice.kind === 'light') { const sub = this.L.segment(seg.start, e); const r = this.voice.score(sub, 0, sub.n); seg.speaker = r.isMe ? 'me' : 'other'; seg.scores.push(r.score); seg.margins.push(r.margin); }
       const wasEcho = seg.echo;
+      if (seg.speaker === 'me' || seg.speaker === 'other') seg.cred[seg.speaker] += Math.max(0, e - seg.since + 1);
+      this.counts.meSec += seg.cred.me / 100; this.counts.otherSec += seg.cred.other / 100;
+      if (seg.speaker === 'me') { this.lastMeEnd = e; this.turn.lastMe = e; }
+      else if (seg.cred.me) { this.lastMeEnd = seg.since; this.turn.lastMe = seg.since; }
+      if (seg.speaker === 'other') { this.lastOtherEnd = e; this.turn.otherAfter = true; }
+      else if (seg.cred.other) this.lastOtherEnd = seg.since;
       if (wasEcho) { this.counts.talkSec += (e - seg.echoAt + 1) / 100; this._echo(false); }
       else if (seg.speaker === 'other') this.counts.other++;
       else if (!seg.passes.length && n >= 15) this.counts.short++;
-      const rec = { id: seg.id, start: seg.start, end: e, speaker: seg.speaker, echo: wasEcho, passes: seg.passes.slice(), scores: seg.scores.slice(), margins: seg.margins.slice(), embs: seg.embs };
+      const rec = { id: seg.id, start: seg.start, end: e, speaker: seg.speaker, echo: wasEcho, interrupt: !!seg.interrupt, passes: seg.passes.slice(), scores: seg.scores.slice(), margins: seg.margins.slice(), embs: seg.embs };
       if (this.voice.kind === 'light' && n >= 30) rec.data = this.L.segment(Math.max(seg.start, e - 600), e);
       if (this.voice.kind === 'neural' && n >= 40) rec.samples = this.L.samples(Math.max(seg.start, e - 600), e);
       for (const h of this.history) { h.samples = null; } // audio is kept only for the newest record (for That was me / Not me)

@@ -24,12 +24,20 @@
   ];
 
   /* ---------- settings (per device) ---------- */
-  const DEF = { mins: 30, delay: 200, vol: 100, strict: 0, psens: 0 };
+  const DEF = { mins: 30, delay: 200, vol: 100, strict: 0, psens: 0, kind: 'silence', limit: 15, noInterrupt: true, nudge: true };
   const settings = Object.assign({}, DEF, (() => { try { return JSON.parse(localStorage.getItem('samt.' + MODE + '.settings') || '{}'); } catch (e) { return {}; } })());
   settings.vol = Math.min(100, settings.vol); settings.strict = Math.max(-1, Math.min(1, Math.round(settings.strict))); settings.psens = Math.max(-1, Math.min(1, Math.round(settings.psens)));
+  settings.kind = settings.kind === 'conversation' ? 'conversation' : 'silence'; settings.limit = Math.max(5, Math.min(60, Math.round(+settings.limit || 15)));
   const saveSettings = () => { try { localStorage.setItem('samt.' + MODE + '.settings', JSON.stringify(settings)); } catch (e) {} };
   const strictValue = () => settings.strict * 1.6;          // threshold moves by 0.8 of your score spread per step
   const phraseSens = () => 1 - settings.psens * 0.1;        // looser = 1.1, stricter = 0.9
+  // Conversation: talk this long in a turn before the echo; at once when talking over someone; a tone first
+  const convParams = () => settings.kind === 'conversation' ? { limit: settings.limit * 100, interrupt: !!settings.noInterrupt, nudge: !!settings.nudge } : { limit: 0, interrupt: false, nudge: false };
+  /* Shared by Light and Neural on this device: the budget, the cards, the sign, the reminders switch. */
+  const SDEF = { budget: 20, remind: true, sign: "I'm keeping quiet", cards: [], remindAt: 0 };
+  const shared = Object.assign({}, SDEF, (() => { try { return JSON.parse(localStorage.getItem('samt.shared') || '{}'); } catch (e) { return {}; } })());
+  shared.budget = Math.max(5, Math.min(240, Math.round(+shared.budget || 20))); if (!Array.isArray(shared.cards)) shared.cards = [];
+  const saveShared = () => { try { localStorage.setItem('samt.shared', JSON.stringify(shared)); } catch (e) {} };
 
   /* ---------- state ---------- */
   const listener = new Listener(), teacher = new Teacher(listener);
@@ -38,6 +46,7 @@
   let ortSession = null, modelP = null, modelMs = 0;
   let session = null; // {mode, endAt, startedAt, timer, paused}
   let wakeLock = null, lastRec = null, toastTimer = 0, pendingFixes = [], howl = 0, echoHoldUntil = 0, starting = null;
+  let history = [], endRec = null, endMood = null, moodCtl = null, showCtx = null, cardsEditing = false, txtResolve = null;
   const mic = FAKE ? new S.mic.FakeMic({ onChunk: onAudio }) : new S.mic.MicEngine({ onChunk: onAudio, onTrouble });
   if (FAKE) mic.speed = +(params.get('speed') || 1);
   const debug = window.SamtDebug = { listener, mic, get ctrl() { return ctrl; }, get voice() { return voice; }, get book() { return book; }, get engine() { return mic; }, profile: () => profile, events: [] };
@@ -61,6 +70,18 @@
   function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2800); }
   function live(state, text) { const l = $('live'); l.dataset.state = state; $('liveText').textContent = text; }
   function fmt(sec) { const s = Math.max(0, Math.ceil(sec)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), r = s % 60; const mm = String(m).padStart(2, '0'), rr = String(r).padStart(2, '0'); return h ? `${h}:${mm}:${rr}` : `${mm}:${rr}`; }
+  const pad2 = n => String(n).padStart(2, '0');
+  function clock(sec) { const s = Math.max(0, Math.floor(sec || 0)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), r = s % 60; return h ? `${h}:${pad2(m)}:${pad2(r)}` : `${m}:${pad2(r)}`; }
+  function minsText(sec) { const s = Math.floor(sec || 0), m = s / 60; return m < 1 ? `${s} s` : m < 10 ? `${(Math.floor(m * 10) / 10).toString()} min` : `${Math.floor(m)} min`; }
+  const dayKey = t => { const d = new Date(t); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+  const timeStr = t => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  function whenStr(t) {
+    const k = dayKey(t), y = new Date(); y.setDate(y.getDate() - 1);
+    const day = k === dayKey(Date.now()) ? 'Today' : k === dayKey(y) ? 'Yesterday' : new Date(t).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+    return `${day}, ${timeStr(t)}`;
+  }
+  const isAr = s => /[؀-ۿ]/.test(s || '');
+  function chevron() { const c = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); c.setAttribute('class', 'ic chev'); const u = document.createElementNS('http://www.w3.org/2000/svg', 'use'); u.setAttribute('href', '#i-chev'); c.appendChild(u); return c; }
   function micError(err) {
     const n = err && err.name;
     if (n === 'NotAllowedError' || n === 'SecurityError') return 'Microphone access is blocked. In Safari, tap the aA button, open Website Settings, set Microphone to Allow, then try again.';
@@ -98,6 +119,30 @@
     $('actScrim').classList.remove('show'); $('actSheet').classList.remove('show');
     setTimeout(() => { if (!actOpen) { $('actScrim').hidden = true; $('actSheet').hidden = true; } }, 380);
   }
+  /* Sheets that rise from the bottom: the cards, the reminders, a session's end, a line of text. */
+  const openSheets = [], closers = {};
+  function openSheet(name) {
+    const p = $(name + 'Panel'), s = $(name + 'Scrim'); p.hidden = false; s.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => { s.classList.add('show'); p.classList.add('show'); }));
+    if (!openSheets.includes(name)) openSheets.push(name);
+    s.onclick = () => (closers[name] || (() => closeSheet(name)))();
+    setTimeout(() => { const f = p.querySelector('.sheet-head button'); if (f && !p.contains(document.activeElement)) f.focus({ preventScroll: true }); }, 80);
+  }
+  function closeSheet(name) {
+    const p = $(name + 'Panel'), s = $(name + 'Scrim'); p.classList.remove('show'); s.classList.remove('show');
+    const i = openSheets.indexOf(name); if (i >= 0) openSheets.splice(i, 1);
+    setTimeout(() => { if (!openSheets.includes(name)) { p.hidden = true; s.hidden = true; } }, 520);
+  }
+  /* A line of text (the sign's own words). Resolves to the text, or null if cancelled. */
+  function promptText({ title, value, max }) {
+    return new Promise(res => {
+      if (txtResolve) txtResolve(null);
+      txtResolve = res; $('txtTitle').textContent = title; const f = $('txtField'); f.value = value || ''; f.maxLength = max || 80;
+      openSheet('txt'); setTimeout(() => f.focus(), 350);
+    });
+  }
+  function endText(save) { const r = txtResolve; txtResolve = null; closeSheet('txt'); if (r) r(save ? $('txtField').value.trim() : null); }
+  closers.txt = () => endText(false);
   /* The press: tint at once on touch-down, sink if small; spring back on release; a 10 px move is a scroll. */
   (function press() {
     let cur = null, x0 = 0, y0 = 0;
@@ -171,8 +216,19 @@
     if (v) { try { voice = MODE === 'light' ? S.LightVoice.fromJSON(v) : S.NeuralVoice.fromJSON(v); } catch (e) { voice = null; } }
     if (voice && MODE === 'neural' && ortSession) voice.attach(window.ort, ortSession);
   }
+  /* Past sessions: one list for Light and Neural (same device, same store), newest last. */
+  async function loadHistory() { const h = await store.get('shared:history'); history = Array.isArray(h) ? h.filter(r => r && r.id && r.at) : []; }
+  async function putRecord(rec) {
+    await loadHistory();
+    const i = history.findIndex(r => r.id === rec.id);
+    if (i >= 0) history[i] = Object.assign({}, history[i], rec); else history.push(rec);
+    history.sort((a, b) => a.at - b.at); if (history.length > 500) history = history.slice(-500);
+    await store.set('shared:history', history);
+  }
+  async function dropRecord(id) { await loadHistory(); history = history.filter(r => r.id !== id); await store.set('shared:history', history); }
   function backup() {
-    const data = { app: 'samt', mode: MODE, version: 2, saved: new Date().toISOString(), settings, profile: S.mic.pack(profile), voice: voice && voice.ready ? S.mic.pack(voice.toJSON()) : null, phrases: S.mic.pack(book.toJSON()) };
+    const data = { app: 'samt', mode: MODE, version: 3, saved: new Date().toISOString(), settings, profile: S.mic.pack(profile), voice: voice && voice.ready ? S.mic.pack(voice.toJSON()) : null, phrases: S.mic.pack(book.toJSON()),
+      shared: { budget: shared.budget, remind: shared.remind, sign: shared.sign, cards: shared.cards }, history };
     const url = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
     const a = document.createElement('a'); a.href = url; a.download = `samt-${MODE}-backup-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000);
@@ -186,7 +242,19 @@
       book = PhraseBook.fromJSON(S.mic.unpack(d.phrases));
       voice = d.voice ? (MODE === 'light' ? S.LightVoice.fromJSON(S.mic.unpack(d.voice)) : S.NeuralVoice.fromJSON(S.mic.unpack(d.voice))) : null;
       if (voice && MODE === 'neural' && ortSession) voice.attach(window.ort, ortSession);
-      await saveAll(); render(); toast('Setup restored.');
+      if (d.shared && typeof d.shared === 'object') {
+        if (d.shared.budget) shared.budget = Math.max(5, Math.min(240, Math.round(+d.shared.budget) || 20));
+        if (typeof d.shared.remind === 'boolean') shared.remind = d.shared.remind;
+        if (typeof d.shared.sign === 'string' && d.shared.sign.trim()) shared.sign = d.shared.sign.slice(0, 60);
+        if (Array.isArray(d.shared.cards)) shared.cards = d.shared.cards.filter(c => typeof c === 'string' && c.trim()).map(c => c.slice(0, 120)).slice(-24);
+        saveShared();
+      }
+      if (Array.isArray(d.history)) {
+        await loadHistory(); const ids = new Set(history.map(r => r.id));
+        for (const r of d.history) if (r && typeof r.id === 'string' && +r.at > 0 && !ids.has(r.id)) history.push(r);
+        history.sort((a, b) => a.at - b.at); history = history.slice(-500); await store.set('shared:history', history);
+      }
+      await saveAll(); render(); renderHistory(); renderToday(); toast('Setup restored.');
     } catch (e) { note(e.message || "Couldn't read that file."); }
   }
 
@@ -345,7 +413,10 @@
   }
   function stateText(e) {
     const test = session && session.mode === 'test';
-    if (e.state === 'echo') return ['echo', test ? 'You. The echo would be on' : 'You. Echo on'];
+    if (e.state === 'echo') {
+      const over = !!(ctrl && ctrl.seg && ctrl.seg.interrupt);
+      return ['echo', over ? (test ? 'Talking over someone. The echo would be on' : 'Talking over someone. Echo on') : (test ? 'You. The echo would be on' : 'You. Echo on')];
+    }
     if (e.state === 'other') return ['other', 'Someone else. Ignored'];
     if (e.state === 'holding') return ['hold', 'Hearing speech'];
     return ['on', test ? 'Testing. Listening' : 'Listening'];
@@ -354,14 +425,35 @@
   function onEvent(e) {
     if (debug.events.length < 4000) debug.events.push(Object.assign({ t: +(listener.fs.nFrames / 100).toFixed(2) }, e));
     if (session && session.paused) return;
-    if (e.type === 'state') { if (performance.now() < phraseShowUntil && e.state !== 'echo') return; const [s, t] = stateText(e); live(s, t); }
+    if (e.type === 'state') {
+      if (ctrl && ctrl.passLeft() > 0) return; // the pill shows the free-talk countdown
+      if (performance.now() < phraseShowUntil && e.state !== 'echo') return;
+      const [s, t] = stateText(e); live(s, t);
+    }
     else if (e.type === 'phrase') { const p = book.get(e.phrase); live('pass', 'Passed: ' + (p ? p.label : 'a phrase')); phraseShowUntil = performance.now() + 1500; renderCounts(); }
+    else if (e.type === 'nudge') { live('hold', session && session.mode === 'test' ? 'A nudge would play now' : 'Nudge: time to wrap up'); phraseShowUntil = performance.now() + 2000; renderCounts(); }
+    else if (e.type === 'interrupt') renderCounts();
     else if (e.type === 'segment') { lastRec = e.rec; renderCounts(); renderLast(); }
   }
   function renderCounts() {
-    const c = ctrl ? ctrl.counts : { talk: 0, talkSec: 0, pass: 0, short: 0, other: 0 };
-    $('cTalk').textContent = c.talk; $('cTalkSec').textContent = c.talkSec >= 60 ? `${(c.talkSec / 60).toFixed(1)} min` : `${Math.round(c.talkSec)} s`;
+    const c = ctrl ? ctrl.counts : { talk: 0, talkTime: 0, pass: 0, short: 0, other: 0, interrupt: 0, nudge: 0 };
+    $('cTalk').textContent = c.talk; $('cTalkTime').textContent = clock(c.talkTime);
     $('cPass').textContent = c.pass; $('cShort').textContent = c.short; $('cOther').textContent = c.other;
+    $('cInt').textContent = c.interrupt || 0; $('cNudge').textContent = c.nudge || 0;
+    $('nudgeRow').hidden = (session ? session.kind : settings.kind) !== 'conversation';
+    renderTL();
+  }
+  /* You and others: the share of the talking Samt heard that was you (the current stretch included). */
+  function renderTL() {
+    let me = 0, ot = 0;
+    if (ctrl && ctrl.counts) {
+      me = ctrl.counts.meSec; ot = ctrl.counts.otherSec;
+      const g = ctrl.seg;
+      if (g && g.cred) { const n = Math.max(0, (g.next - g.since) / 100); me += g.cred.me / 100 + (g.speaker === 'me' ? n : 0); ot += g.cred.other / 100 + (g.speaker === 'other' ? n : 0); }
+    }
+    const tot = me + ot, you = tot >= 1 ? Math.round(100 * me / tot) : null;
+    $('tlMe').textContent = you == null ? '–' : you + '%'; $('tlOth').textContent = you == null ? '–' : (100 - you) + '%';
+    $('tlBar').style.width = (you || 0) + '%';
   }
   function renderLast() {
     const r = lastRec;
@@ -404,26 +496,67 @@
     started.then(() => {
       listener.reset();
       voice.strict = strictValue(); book.sens = phraseSens();
-      ctrl = new Controller({ listener, voice, book, onEcho: setEcho, onEvent });
+      ctrl = new Controller({ listener, voice, book, onEcho: setEcho, onEvent, onNudge: () => { if (mic.chime) mic.chime(); }, params: convParams() });
       ctrl.start(mode === 'test' ? 'test' : 'silence');
-      session = { mode, startedAt: Date.now(), endAt: mode === 'test' ? null : Date.now() + plannedMs(), paused: false };
+      const now = Date.now();
+      session = { mode, kind: settings.kind, startedAt: now, endAt: mode === 'test' ? null : now + plannedMs(), paused: false, bestQuiet: 0, recId: 's' + now.toString(36), savedAt: now, uiAt: 0, warned: 0, passing: false };
       lastRec = null; renderLast(); renderCounts(); render();
+      if (mode !== 'test') showSessionReminder(); else $('remind').hidden = true;
+      $('quietLine').hidden = false;
       session.timer = setInterval(tickSession, 250); tickSession();
     }, e => { setBusy(null); releaseWake(); note(micError(e)); });
   }
+  /* The session as a record for the past-sessions list (null for a test). With the test mic, the length is audio time. */
+  function sessionSnap() {
+    const s = session; if (!s || s.mode === 'test' || !ctrl) return null;
+    const c = ctrl.counts;
+    return { id: s.recId, at: s.startedAt, dur: FAKE ? Math.round(listener.fs.nFrames / 100) : Math.max(0, Math.round((Date.now() - s.startedAt) / 1000)), page: MODE, kind: s.kind, talkTime: +c.talkTime.toFixed(2), meSec: +c.meSec.toFixed(2), otherSec: +c.otherSec.toFixed(2),
+      talks: c.talk, interrupts: c.interrupt, nudges: c.nudge, freePass: c.freePass, phrases: c.pass, shorts: c.short, others: c.other, bestQuiet: Math.round(s.bestQuiet) };
+  }
   function tickSession() {
     if (!session) return;
-    if (session.endAt) { const left = (session.endAt - Date.now()) / 1000; $('readout').textContent = fmt(left); if (left <= 0) stopSession(true); }
+    if (session.endAt) { const left = (session.endAt - Date.now()) / 1000; $('readout').textContent = fmt(left); if (left <= 0) { stopSession(true); return; } }
     else $('readout').textContent = fmt((Date.now() - session.startedAt) / 1000);
+    if (!ctrl || session.paused) return;
+    // the quiet timer: since your last words (or since the start)
+    const g = ctrl.seg, talking = !!(g && g.speaker === 'me');
+    const quiet = talking ? 0 : Math.max(0, (listener.fs.nFrames - ctrl.lastMeEnd) / 100);
+    session.bestQuiet = Math.max(session.bestQuiet, quiet);
+    $('quietLine').firstChild.textContent = talking ? 'Talking' : 'Quiet for '; $('quietFor').textContent = talking ? '' : clock(quiet);
+    // talk freely: the countdown on the pill and the button
+    const left = ctrl.passLeft();
+    $('pass').textContent = left > 0 ? `Talking freely, ${Math.ceil(left)} s` : 'Talk freely, 10 s';
+    if (left > 0) { live('pass', `Talking freely for ${Math.ceil(left)} s`); session.passing = true; }
+    else if (session.passing) { session.passing = false; live('on', 'Listening'); }
+    renderTL(); $('cTalkTime').textContent = clock(ctrl.counts.talkTime);
+    if (session.mode === 'test') return;
+    const now = Date.now();
+    if (now - session.uiAt >= 1000) { session.uiAt = now; renderToday(true); budgetWarn(); }
+    if (now - session.savedAt >= 30000) { session.savedAt = now; const s = sessionSnap(); if (s) putRecord(Object.assign(s, { open: true })).catch(() => {}); } // in case the tab is closed
+  }
+  function budgetWarn() {
+    const m = dayTotals(), t = (m.get(dayKey(Date.now())) || { talk: 0 }).talk, bud = shared.budget * 60;
+    if (session.warned < 1 && t >= bud * 0.8 && t < bud) { session.warned = 1; toast(`${clock(bud - t)} of talk left in today's budget.`); }
+    if (session.warned < 2 && t >= bud) { session.warned = 2; toast("You've used today's talk budget."); }
   }
   async function stopSession(finished) {
     if (!session) return;
+    if (ctrl && ctrl.seg) { try { ctrl.cut(); } catch (e) {} } // count the words still in progress
+    const snap = sessionSnap();
     clearInterval(session.timer); session = null;
     if (ctrl) ctrl.stop();
-    releaseMic(); releaseWake();
+    releaseMic(); if (!showCtx) releaseWake();
     const c = ctrl ? ctrl.counts : { talk: 0 };
+    $('quietLine').hidden = true; $('remind').hidden = true;
     refreshReadout(); setBusy(null);
     live(finished ? 'done' : 'off', finished ? `Done. You talked ${c.talk} time${c.talk === 1 ? '' : 's'}.` : 'Stopped');
+    // keep the session (30 seconds or longer) and open its summary
+    if (snap && snap.dur >= 30) {
+      snap.open = false;
+      try { await putRecord(snap); } catch (e) {}
+      renderHistory(); renderToday();
+      openEnd(history.find(r => r.id === snap.id) || snap, false);
+    }
     // keep learning: speech that was confidently you, plus any That was me / Not me from this session
     const q = ctrl ? ctrl.adaptQueue.slice() : [], fixes = pendingFixes.splice(0);
     if ((q.length || fixes.length) && voice) {
@@ -446,6 +579,238 @@
     if (!mic.running || !mic.trackLive()) onTrouble('interrupted');
   });
 
+  /* ---------- today: talk time against the daily budget, the week, past sessions ---------- */
+  const MOODS = { easy: 'Easy', okay: 'Okay', hard: 'Hard' };
+  function allRecs() { const snap = sessionSnap(), list = history.filter(r => !snap || r.id !== snap.id); if (snap) list.push(snap); return list; }
+  function dayTotals() {
+    const m = new Map();
+    for (const r of allRecs()) { const k = dayKey(r.at), d = m.get(k) || { talk: 0, n: 0 }; d.talk += +r.talkTime || 0; d.n++; m.set(k, d); }
+    return m;
+  }
+  /* Days in a row (to today, or to yesterday if there's no session yet today) with sessions and talk within the budget. */
+  function streakDays(m) {
+    let n = 0; const d = new Date(); if (!m.has(dayKey(d))) d.setDate(d.getDate() - 1);
+    for (let g = 0; g < 1000; g++) { const x = m.get(dayKey(d)); if (!x || x.talk > shared.budget * 60) break; n++; d.setDate(d.getDate() - 1); }
+    return n;
+  }
+  let weekDays = [], weekSel = 6;
+  function renderToday(quick) {
+    const m = dayTotals(), talk = Math.floor((m.get(dayKey(Date.now())) || { talk: 0 }).talk), bud = shared.budget * 60, over = talk > bud;
+    $('todayTalk').textContent = clock(talk); $('todayBudget').textContent = clock(bud);
+    $('todayLeft').textContent = over ? `Over by ${clock(talk - bud)}` : `${clock(bud - talk)} left`;
+    $('budgetBar').style.width = Math.min(100, 100 * talk / bud).toFixed(1) + '%'; $('budgetTrack').classList.toggle('over', over);
+    $('budgetOut').textContent = shared.budget + ' min';
+    const n = streakDays(m); $('streak').textContent = n === 1 ? '1 day' : `${n} days`;
+    renderWeek(m, quick);
+  }
+  function renderWeek(m, quick) {
+    const plot = $('weekPlot'), bud = shared.budget * 60, now = new Date(), days = [];
+    for (let i = 6; i >= 0; i--) { const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i), x = m.get(dayKey(d)) || { talk: 0, n: 0 }; days.push({ d, talk: x.talk, n: x.n }); }
+    const max = Math.max(bud * 1.25, 60, ...days.map(x => x.talk));
+    let cols = plot.querySelectorAll('.wk-col');
+    if (cols.length !== 7) {
+      for (let i = 0; i < 7; i++) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'wk-col';
+        const bar = document.createElement('i'); bar.className = 'wk-bar'; b.appendChild(bar);
+        b.onclick = () => { weekSel = i; plot.classList.add('touched'); renderWeekSel(); };
+        b.onpointerenter = e => { if (e.pointerType === 'mouse') { weekSel = i; plot.classList.add('touched'); renderWeekSel(); } };
+        plot.appendChild(b);
+      }
+      cols = plot.querySelectorAll('.wk-col');
+    }
+    days.forEach((x, i) => {
+      const bar = cols[i].firstChild; bar.classList.toggle('none', !x.n);
+      bar.style.height = x.n ? Math.max(1.5, 100 * x.talk / max).toFixed(1) + '%' : '0';
+      cols[i].setAttribute('aria-label', `${x.d.toLocaleDateString([], { weekday: 'long' })}: ${x.n ? minsText(x.talk) + ' of talk' : 'no sessions'}`);
+    });
+    $('weekBudget').style.bottom = (100 * bud / max).toFixed(1) + '%';
+    const key = dayKey(now) + '|' + days.map(x => x.n + ':' + Math.round(x.talk)).join(',');
+    if (!quick || $('weekDays').dataset.key !== dayKey(now)) {
+      const lab = $('weekDays'); lab.textContent = ''; lab.dataset.key = dayKey(now);
+      days.forEach((x, i) => { const s = document.createElement('span'); s.textContent = x.d.toLocaleDateString([], { weekday: 'short' }); if (i === 6) s.className = 'today'; lab.appendChild(s); });
+    }
+    if (!quick || $('weekTable').dataset.key !== key) {
+      const tb = $('weekTable'); tb.textContent = ''; tb.dataset.key = key;
+      const cap = document.createElement('caption'); cap.textContent = 'Talk time, last 7 days'; tb.appendChild(cap);
+      for (const x of days) { const tr = document.createElement('tr'), th = document.createElement('th'), td = document.createElement('td'); th.textContent = x.d.toDateString(); td.textContent = x.n ? minsText(x.talk) : 'no sessions'; tr.append(th, td); tb.appendChild(tr); }
+    }
+    weekDays = days; renderWeekSel();
+  }
+  function renderWeekSel() {
+    const x = weekDays[weekSel]; if (!x) return;
+    $('weekPlot').querySelectorAll('.wk-col').forEach((c, i) => c.setAttribute('aria-pressed', String(i === weekSel)));
+    const el = $('weekSel'); el.textContent = (weekSel === 6 ? 'Today' : x.d.toLocaleDateString([], { weekday: 'long' })) + ': ';
+    const b = document.createElement('b'); b.textContent = x.n ? minsText(x.talk) : 'no sessions'; el.appendChild(b);
+  }
+  function renderHistory() {
+    const box = $('histList'); box.textContent = '';
+    const live = session && session.recId; // the session running now is not a past one yet
+    const list = history.filter(r => r.id !== live).sort((a, b) => b.at - a.at).slice(0, 30);
+    if (!list.length) {
+      box.innerHTML = '<div class="empty"><span class="tile soft" aria-hidden="true"><svg class="ic"><use href="#i-hush"/></svg></span><b>No sessions yet</b><span>Each session you finish shows here, with how much you talked.</span></div>';
+      return;
+    }
+    for (const r of list) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'row';
+      const t = document.createElement('span'); t.className = 'rt'; t.textContent = whenStr(r.at);
+      const s2 = document.createElement('span'); s2.className = 'r2'; s2.textContent = `${r.kind === 'conversation' ? 'Conversation' : 'Silence'} · ${minsText(r.dur)}${MOODS[r.mood] ? ' · ' + MOODS[r.mood] : ''}`; t.appendChild(s2);
+      const v = document.createElement('span'); v.className = 'rv'; v.textContent = clock(r.talkTime) + ' talk';
+      b.append(t, v, chevron()); b.onclick = () => openEnd(r, true); box.appendChild(b);
+    }
+    const clr = document.createElement('button'); clr.type = 'button'; clr.className = 'row danger'; clr.textContent = 'Clear the past sessions';
+    clr.onclick = () => ask({ title: 'Clear the past sessions?', msg: 'Every past session on this device is deleted, for Light and Neural. Your voice setup stays.',
+      actions: [{ label: 'Clear them', danger: true, run: async () => { history = []; await store.set('shared:history', []); renderHistory(); renderToday(); toast('Cleared.'); } }] });
+    box.appendChild(clr);
+  }
+
+  /* ---------- a session's end: the numbers, a mood, a note, and Claude's summary if asked for ---------- */
+  const CLAUDE_HINT = "Sends this session's numbers, your mood and your note to Claude. Your voice and the audio stay on this device.";
+  function openEnd(rec, review) {
+    if (endRec && endRec !== rec) { // another session's sheet was still open: keep what was typed there
+      const prev = endRec; prev.note = $('endNote').value.trim().slice(0, 300); prev.mood = endMood;
+      putRecord({ id: prev.id, at: prev.at, mood: prev.mood, note: prev.note, summary: prev.summary || '' }).catch(() => {});
+    }
+    endRec = rec; endMood = rec.mood || null;
+    $('endTitle').textContent = review ? whenStr(rec.at) : 'Session done';
+    const st = $('endStats'); st.textContent = '';
+    const tot = (+rec.meSec || 0) + (+rec.otherSec || 0), you = tot >= 1 ? Math.round(100 * rec.meSec / tot) : null;
+    const rows = [['Kind', rec.kind === 'conversation' ? 'Conversation' : 'Silence'], ['Length', clock(rec.dur)], ['Talk time', clock(rec.talkTime)],
+      ['You and others', you == null ? 'No talking heard' : `You ${you}% · Others ${100 - you}%`], ['Longest quiet', clock(rec.bestQuiet)], ['Times echoed', String(rec.talks || 0)], ['Phrases passed', String(rec.phrases || 0)]];
+    if (rec.interrupts) rows.push(['Talked over someone', String(rec.interrupts)]);
+    if (rec.kind === 'conversation') rows.push(['Nudges', String(rec.nudges || 0)]);
+    if (rec.freePass) rows.push(['Talk freely taps', String(rec.freePass)]);
+    for (const [a, b] of rows) { const r = document.createElement('div'); r.className = 'row'; const x = document.createElement('span'); x.className = 'rt'; x.textContent = a; const y = document.createElement('span'); y.className = 'rv'; y.textContent = b; r.append(x, y); st.appendChild(r); }
+    moodCtl.set(endMood); $('endNote').value = rec.note || '';
+    showSummary(rec.summary);
+    $('askClaude').disabled = false; $('askClaude').textContent = rec.summary ? 'Ask Claude again' : 'Ask Claude for a summary';
+    $('claudeHint').textContent = CLAUDE_HINT; $('endDelete').hidden = !review;
+    openSheet('end');
+  }
+  function showSummary(t) { $('endSummary').hidden = !t; $('endSummaryText').textContent = t || ''; }
+  async function closeEnd() {
+    const r = endRec; endRec = null; closeSheet('end');
+    if (!r) return;
+    r.note = $('endNote').value.trim().slice(0, 300); r.mood = endMood;
+    try { await putRecord({ id: r.id, at: r.at, mood: r.mood, note: r.note, summary: r.summary || '' }); } catch (e) {}
+    renderHistory();
+  }
+  closers.end = closeEnd;
+  async function askClaude() {
+    const r = endRec; if (!r) return;
+    r.note = $('endNote').value.trim().slice(0, 300); r.mood = endMood;
+    const m = dayTotals(), now = new Date(), week = [];
+    for (let i = 6; i >= 0; i--) { const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i), x = m.get(dayKey(d)) || { talk: 0, n: 0 }; week.push({ day: d.toLocaleDateString('en-US', { weekday: 'short' }), talkMin: +(x.talk / 60).toFixed(1), sessions: x.n }); }
+    const tot = (+r.meSec || 0) + (+r.otherSec || 0);
+    const body = { session: { kind: r.kind, minutes: +(r.dur / 60).toFixed(1), talkMin: +((+r.talkTime || 0) / 60).toFixed(1), youPercent: tot >= 1 ? Math.round(100 * r.meSec / tot) : null,
+      longestQuietMin: +((+r.bestQuiet || 0) / 60).toFixed(1), echoes: r.talks || 0, phrasesPassed: r.phrases || 0, talkedOverSomeone: r.interrupts || 0, nudges: r.nudges || 0, talkFreelyTaps: r.freePass || 0,
+      mood: r.mood || null, note: r.note || '' }, dailyBudgetMin: shared.budget, last7Days: week, daysWithinBudget: streakDays(m) };
+    const btn = $('askClaude'); btn.disabled = true; btn.textContent = 'Asking Claude…'; $('claudeHint').textContent = CLAUDE_HINT;
+    try {
+      const res = await fetch(CFG.summaryUrl || '/api/summary', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+      let j = {}; try { j = await res.json(); } catch (e) {}
+      if (res.status === 429) throw new Error('Claude was asked too often just now. Try again in a minute.');
+      if (!res.ok || !j.summary) throw new Error(j.error || 'Claude is not available right now. Try again later.');
+      r.summary = String(j.summary).slice(0, 1500);
+      if (endRec === r) showSummary(r.summary);
+      await putRecord({ id: r.id, at: r.at, summary: r.summary, mood: r.mood, note: r.note });
+      btn.textContent = 'Ask Claude again';
+    } catch (e) {
+      $('claudeHint').textContent = e && e.name === 'TypeError' ? "Couldn't reach Claude. A summary needs the internet, and Samt opened from samt-quiet.netlify.app." : (e && e.message) || "Couldn't get a summary.";
+      btn.textContent = r.summary ? 'Ask Claude again' : 'Ask Claude for a summary';
+    }
+    btn.disabled = false;
+  }
+
+  /* ---------- without your voice: cards, speaking them, the sign ---------- */
+  const CARDS = ['Yes', 'No', 'One moment', 'Thank you', "I'm keeping quiet right now", 'Please write it down', "I'll answer later", 'جزاك الله خيرًا'];
+  const SIGN_WORDS = ["I'm keeping quiet", 'Quiet time', 'In silence for now', 'Not talking right now'];
+  function setDir(el, text) { if (isAr(text)) { el.lang = 'ar'; el.dir = 'rtl'; } else { el.removeAttribute('lang'); el.removeAttribute('dir'); } }
+  function renderCards() {
+    const g = $('cardGrid'); g.textContent = ''; g.classList.toggle('editing', cardsEditing);
+    const all = CARDS.map(t => ({ t, custom: false })).concat(shared.cards.map(t => ({ t, custom: true })));
+    for (const c of all) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'cardb' + (isAr(c.t) ? ' ar' : '') + (c.custom ? ' custom' : ''); b.textContent = c.t; setDir(b, c.t);
+      b.onclick = () => {
+        if (!cardsEditing) { show(c.t); return; }
+        if (c.custom) ask({ title: c.t, actions: [{ label: 'Delete this card', danger: true, run: () => { shared.cards = shared.cards.filter(x => x !== c.t); saveShared(); if (!shared.cards.length) cardsEditing = false; renderCards(); } }] });
+      };
+      g.appendChild(b);
+    }
+    $('cardsEdit').textContent = cardsEditing ? 'Done' : 'Edit'; $('cardsEdit').hidden = !shared.cards.length && !cardsEditing; $('cardsHint').hidden = !cardsEditing;
+  }
+  function show(text, opt) {
+    opt = opt || {};
+    const keepTurn = !!(showCtx && opt.keepTurn && $('showView').classList.contains('turned'));
+    showCtx = Object.assign({ text }, opt);
+    const t = $('showText'); t.textContent = text; t.classList.toggle('ar', isAr(text)); setDir(t, text);
+    $('showSub').textContent = opt.sub || ''; $('showSub').hidden = !opt.sub;
+    $('showGlyph').hidden = !opt.sign; $('showWords').hidden = !opt.sign;
+    const v = $('showView'); v.classList.toggle('turned', keepTurn); v.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => v.classList.add('show')));
+    setTimeout(() => { if (showCtx) $('showClose').focus({ preventScroll: true }); }, 60);
+    requestWake();
+  }
+  function hideShow() {
+    if (!showCtx) return; showCtx = null;
+    try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) {}
+    const v = $('showView'); v.classList.remove('show'); setTimeout(() => { if (!showCtx) v.hidden = true; }, 260);
+    if (!session) releaseWake();
+  }
+  function speak(text) {
+    const ss = window.speechSynthesis;
+    if (!ss || typeof SpeechSynthesisUtterance === 'undefined') { toast("This browser can't read text out loud."); return; }
+    try {
+      ss.cancel();
+      const u = new SpeechSynthesisUtterance(text), ar = isAr(text); u.lang = ar ? 'ar-SA' : 'en-US'; u.rate = 0.95;
+      const vs = ss.getVoices ? ss.getVoices() : [], v = vs.find(x => (x.lang || '').toLowerCase().startsWith(ar ? 'ar' : 'en'));
+      if (v) u.voice = v; else if (ar && vs.length) toast('No Arabic voice is installed, so it may sound wrong.');
+      ss.speak(u);
+    } catch (e) { toast("Couldn't read it out loud."); }
+  }
+  const signSub = () => session && session.endAt && session.mode !== 'test' ? `Until ${timeStr(session.endAt)}. I can read and write.` : 'I can read and write.';
+  function openSign() { show(shared.sign || SIGN_WORDS[0], { sub: signSub(), sign: true }); }
+  function setSign(w) { shared.sign = w.slice(0, 60); saveShared(); if (showCtx && showCtx.sign) show(shared.sign, { sub: signSub(), sign: true, keepTurn: true }); }
+  function changeSignWords() {
+    ask({ title: 'Words for the sign', actions: SIGN_WORDS.map(w => ({ label: w, run: () => setSign(w) })).concat([{ label: 'Your own words', run: async () => { const v = await promptText({ title: 'Words for the sign', value: shared.sign, max: 60 }); if (v) setSign(v); } }]) });
+  }
+
+  /* ---------- reminders: Qur'an (Tanzil Uthmani) and hadith (sunnah.com), the meaning on a tap ---------- */
+  const REM = window.SAMT_REMINDERS || { verses: [], hadith: [] };
+  const remItems = () => (REM.verses || []).map(v => Object.assign({ kind: 'verse' }, v)).concat((REM.hadith || []).map(h => Object.assign({ kind: 'hadith' }, h)));
+  function fillRem(box, it, full) {
+    box.textContent = '';
+    const add = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; box.appendChild(e); return e; };
+    if (it.kind === 'hadith') add('p', 'ref', 'The Prophet ﷺ said');
+    const ar = add('p', 'ar', it.text); ar.lang = 'ar'; ar.dir = 'rtl';
+    const ref = add('p', 'ref');
+    if (it.kind === 'verse') { const n = document.createElement('span'); n.className = 'arn'; n.lang = 'ar'; n.dir = 'rtl'; n.textContent = it.surah; ref.append(n, ' ' + it.ref); }
+    else ref.textContent = it.ref + (it.grade ? ' · ' + it.grade : '');
+    const meaning = it.kind === 'verse' ? (it.pickthall ? it.pickthall + ' (Pickthall)' : null) : (it.meaning ? 'In plain words: ' + it.meaning : null);
+    if (meaning) {
+      const b = add('button', 'btn plain', 'Meaning'); b.type = 'button'; b.setAttribute('aria-expanded', 'false');
+      const m = add('p', 'mean', meaning); m.hidden = true;
+      b.onclick = () => { m.hidden = !m.hidden; b.textContent = m.hidden ? 'Meaning' : 'Hide the meaning'; b.setAttribute('aria-expanded', String(!m.hidden)); };
+    }
+    if (full && it.url) { const a = add('a', 'btn plain', 'Open on sunnah.com'); a.href = it.url; a.target = '_blank'; a.rel = 'noopener'; }
+  }
+  function renderRemList() {
+    const box = $('remList'); box.textContent = '';
+    const items = remItems();
+    for (const [cap, kind] of [["Qur'an", 'verse'], ['Hadith (sayings of the Prophet ﷺ)', 'hadith']]) {
+      const list = items.filter(x => x.kind === kind); if (!list.length) continue;
+      const h = document.createElement('h3'); h.className = 'cap'; h.textContent = cap; box.appendChild(h);
+      for (const it of list) { const g = document.createElement('div'); g.className = 'group'; const r = document.createElement('div'); r.className = 'rem'; fillRem(r, it, true); g.appendChild(r); box.appendChild(g); }
+    }
+    $('remSource').textContent = REM.sources || '';
+    $('swRemind').setAttribute('aria-checked', String(!!shared.remind));
+  }
+  function showSessionReminder() {
+    const box = $('remind'), items = remItems();
+    if (!shared.remind || !items.length) { box.hidden = true; return; }
+    const i = (+shared.remindAt || 0) % items.length; shared.remindAt = (i + 1) % items.length; saveShared();
+    fillRem(box, items[i], false); box.hidden = false;
+  }
+
   /* ---------- rendering ---------- */
   function setBusy(b) { busy = b; render(); }
   function refreshReadout() { if (!session) $('readout').textContent = fmt(plannedMs() / 1000); }
@@ -462,8 +827,10 @@
     const inS = busy === 'silence', inT = busy === 'test', paused = !!(session && session.paused);
     $('go').disabled = !(idle || inS || (inT && paused)) || !taught || !modelOk;
     $('test').disabled = !(idle || inT) || !taught || !modelOk;
-    $('go').textContent = paused ? 'Resume' : inS ? 'Stop' : 'Start silence';
+    $('go').textContent = paused ? 'Resume' : inS ? 'Stop' : settings.kind === 'conversation' ? 'Start conversation' : 'Start silence';
     $('test').textContent = inT ? 'Stop test' : 'Test without echo';
+    $('test').hidden = inS; $('pass').hidden = !inS || paused;
+    $('kindSeg').querySelectorAll('button').forEach(b => { b.disabled = !idle; });
     if (idle && $('live').dataset.state === 'off') live('off', !modelOk ? 'Loading the voice model' : taught ? 'Ready' : 'Teach Samt your voice to begin');
     renderPhrases();
   }
@@ -506,7 +873,54 @@
     $('recSkip').onclick = () => rec && rec.skip && rec.skip();
     $('wasMe').onclick = () => correct(true); $('notMe').onclick = () => correct(false);
     $('actCancel').onclick = closeAsk; $('actScrim').onclick = closeAsk;
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (actOpen) closeAsk(); else if (rec) rec.finish(true); } });
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Escape') return;
+      if (actOpen) closeAsk();
+      else if (openSheets.includes('txt')) endText(false);
+      else if (showCtx) hideShow();
+      else if (openSheets.length) { const top = openSheets[openSheets.length - 1]; (closers[top] || (() => closeSheet(top)))(); }
+      else if (rec) rec.finish(true);
+    });
+    // the kind of session, talking freely, and the conversation rules
+    seg($('kindSeg'), [{ v: 'silence', label: 'Silence' }, { v: 'conversation', label: 'Conversation' }], settings.kind, v => { settings.kind = v; saveSettings(); render(); renderCounts(); });
+    $('pass').onclick = () => { if (!ctrl || !session || session.mode === 'test' || session.paused) return; ctrl.pass(Math.min(60, ctrl.passLeft() + 10)); tickSession(); };
+    const applyConv = () => { if (ctrl && session && session.kind === 'conversation') Object.assign(ctrl.p, convParams()); };
+    const sw = (id, key) => { const el = $(id), sync = () => el.setAttribute('aria-checked', String(!!settings[key])); el.onclick = () => { settings[key] = !settings[key]; saveSettings(); sync(); applyConv(); }; sync(); };
+    sw('swInterrupt', 'noInterrupt'); sw('swNudge', 'nudge');
+    // the daily budget
+    $('budgetDown').onclick = () => { shared.budget = Math.max(5, shared.budget - (shared.budget > 60 ? 15 : 5)); saveShared(); renderToday(); };
+    $('budgetUp').onclick = () => { shared.budget = Math.min(240, shared.budget + (shared.budget >= 60 ? 15 : 5)); saveShared(); renderToday(); };
+    // without your voice
+    $('openCards').onclick = () => { cardsEditing = false; renderCards(); openSheet('cards'); };
+    $('cardsClose').onclick = () => closeSheet('cards');
+    $('cardsEdit').onclick = () => { cardsEditing = !cardsEditing; renderCards(); };
+    const typed = () => $('cardText').value.trim();
+    $('cardShowTyped').onclick = () => { const v = typed(); if (v) show(v); else $('cardText').focus(); };
+    $('cardSpeakTyped').onclick = () => { const v = typed(); if (v) speak(v); else $('cardText').focus(); };
+    $('cardSaveTyped').onclick = () => {
+      const v = typed(); if (!v) { $('cardText').focus(); return; }
+      if (!CARDS.includes(v) && !shared.cards.includes(v)) { shared.cards = shared.cards.concat([v.slice(0, 120)]).slice(-24); saveShared(); }
+      $('cardText').value = ''; renderCards(); toast('Saved as a card.');
+    };
+    $('cardForm').addEventListener('submit', e => { e.preventDefault(); $('cardShowTyped').click(); });
+    $('openSign').onclick = openSign;
+    $('showClose').onclick = hideShow;
+    $('showSpeak').onclick = () => { if (showCtx) speak(showCtx.text + (showCtx.sign && showCtx.sub ? '. ' + showCtx.sub : '')); };
+    $('showTurn').onclick = () => $('showView').classList.toggle('turned');
+    $('showWords').onclick = changeSignWords;
+    $('openRemind').onclick = () => { renderRemList(); openSheet('rem'); };
+    $('remClose').onclick = () => closeSheet('rem');
+    $('swRemind').onclick = () => { shared.remind = !shared.remind; saveShared(); $('swRemind').setAttribute('aria-checked', String(shared.remind)); $('remindStatus').textContent = shared.remind ? 'On' : 'Off'; };
+    // a session's end
+    moodCtl = seg($('moodSeg'), [{ v: 'easy', label: 'Easy' }, { v: 'okay', label: 'Okay' }, { v: 'hard', label: 'Hard' }], null, v => { endMood = v; });
+    $('endDone').onclick = closeEnd; $('endClose').onclick = closeEnd; $('askClaude').onclick = askClaude;
+    $('endDelete').onclick = () => {
+      const r = endRec; if (!r) return;
+      ask({ title: 'Delete this session?', msg: 'It leaves the list and the totals.', actions: [{ label: 'Delete', danger: true, run: async () => { if (endRec === r) { endRec = null; closeSheet('end'); } await dropRecord(r.id); renderHistory(); renderToday(); } }] });
+    };
+    // a line of text
+    $('txtSave').onclick = () => endText(true); $('txtClose').onclick = () => endText(false);
+    $('txtForm').addEventListener('submit', e => { e.preventDefault(); endText(true); });
     $('addPhrase').addEventListener('submit', async e => { e.preventDefault(); const v = $('newPhrase').value.trim(); if (!v) return; book.add(v.slice(0, 60)); $('newPhrase').value = ''; await saveAll(); render(); });
     const presets = seg($('presets'), [{ v: 15, label: '15 min' }, { v: 30, label: '30 min' }, { v: 60, label: '1 hr' }, { v: 120, label: '2 hr' }, { v: 240, label: '4 hr' }], settings.mins, v => { settings.mins = v; $('until').value = ''; saveSettings(); syncTimer(); });
     const syncTimer = () => { $('minsOut').textContent = settings.mins; presets.set($('until').value ? null : settings.mins); $('clearUntil').hidden = !$('until').value; refreshReadout(); };
@@ -521,6 +935,7 @@
     };
     stepper('delay', 'delayDown', 'delayUp', 'delayOut', 20, 60, 400, v => v + ' ms', () => mic.setDelay(settings.delay / 1000));
     stepper('vol', 'volDown', 'volUp', 'volOut', 10, 10, 100, v => v + '%', () => mic.setVolume(settings.vol / 100));
+    stepper('limit', 'limitDown', 'limitUp', 'limitOut', 5, 5, 60, v => v + ' s', () => { if (ctrl && session && session.kind === 'conversation') Object.assign(ctrl.p, convParams()); });
     const LSB = [{ v: -1, label: 'Looser' }, { v: 0, label: 'Balanced' }, { v: 1, label: 'Stricter' }];
     seg($('strictSeg'), LSB, settings.strict, v => { settings.strict = v; saveSettings(); if (voice) voice.strict = strictValue(); });
     seg($('psensSeg'), LSB, settings.psens, v => { settings.psens = v; saveSettings(); book.sens = phraseSens(); });
@@ -545,6 +960,12 @@
     await loadAll();
     if (!(await store.available())) $('storeWarn').hidden = false;
     live('off', 'Ready'); render(); renderCounts();
+    $('remindStatus').textContent = shared.remind ? 'On' : 'Off';
+    try { await loadHistory(); } catch (e) {}
+    renderHistory(); renderToday();
+    setInterval(() => { if (!session) renderToday(true); }, 60000); // a new day starts at midnight
+    document.addEventListener('visibilitychange', async () => { if (document.visibilityState === 'visible' && !session) { try { await loadHistory(); } catch (e) {} renderHistory(); renderToday(); } });
+    debug.history = () => history; debug.shared = shared;
     if (FAKE) { debug.feed = async (name, url) => { const b = await (await fetch(url)).arrayBuffer(); return mic.play(name, new Float32Array(b)); }; debug.ensureEngine = ensureMic; }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();

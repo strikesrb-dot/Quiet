@@ -24,7 +24,7 @@ html.ql {
   --q-acc:#a8502e; --q-acc-ink:#f9f9f7; --q-acc-soft:color-mix(in srgb, #a8502e 13%, transparent);
   --q-glass:color-mix(in srgb, rgba(252,252,249,.82), #fcfcf9 35%); --q-glass-rim:inset 0 0 0 1px #fff; --q-glass-edge:0 0 0 .5px rgba(0,0,0,.10);
   --q-sh-glass:0 4px 32px rgba(0,0,0,.11); --q-blur:blur(20px) saturate(1.7); --q-sh-sheet:0 24px 64px -16px rgba(0,0,0,.25);
-  --q-sh-thumb:0 1px 3px rgba(0,0,0,.12);
+  --q-sh-thumb:0 1px 3px rgba(0,0,0,.12); --q-track:#e3e2dd; --q-mark:#a8502e;
   --q-ui:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
   --q-ar:"SF Arabic", "Geeza Pro", "Noto Naskh Arabic", "Arabic Typesetting", serif;
   --q-r-icon:8px; --q-r-ctl:14px; --q-r-group:26px; --q-r-sheet:32px; --q-r-cap:999px;
@@ -40,6 +40,7 @@ html.ql body.theme-dark {
   --q-acc:#e0906c; --q-acc-ink:#20201f; --q-acc-soft:color-mix(in srgb, #e0906c 18%, transparent);
   --q-glass:color-mix(in srgb, rgba(44,43,40,.72), #2c2b28 35%); --q-glass-rim:inset 0 0 0 1px rgba(255,255,255,.11); --q-glass-edge:0 0 0 .5px rgba(0,0,0,.55);
   --q-sh-glass:0 4px 36px rgba(0,0,0,.44); --q-sh-sheet:0 24px 64px -16px rgba(0,0,0,.6); --q-sh-thumb:0 1px 3px rgba(0,0,0,.4);
+  --q-track:#4a4945; --q-mark:#cf7c57; /* chart marks: a step darker than the dark accent, inside the chart lightness band */
   color-scheme: dark;
 }
 @media (prefers-reduced-transparency: reduce) { html.ql { --q-glass:#fcfcf9; --q-blur:none; } html.ql body.theme-dark { --q-glass:#2c2b28; } }
@@ -159,7 +160,7 @@ html.ql body.theme-dark .seg .th { background: var(--q-selected); }
 .asheet .msg + .row::before { content: ""; position: absolute; top: 0; inset-inline: 0; height: .5px; background: var(--q-hair); }
 .asheet .row.danger { color: var(--q-danger); }
 .asheet .row.cancel { font-weight: 800; color: var(--q-ink); }
-#actScrim { z-index: 42; }
+#actScrim { z-index: 45; } .asheet { z-index: 46; } /* above a shown card or sign, so its choices can open over it */
 
 /* the toast */
 .toast { position: fixed; z-index: 50; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); max-width: calc(100% - 32px); min-height: var(--tap);
@@ -174,7 +175,88 @@ html.ql body.theme-dark .seg .th { background: var(--q-selected); }
 .btn.strong.is-press { background-image: linear-gradient(rgba(255,255,255,.14), rgba(255,255,255,.14)); }
 html.ql body.theme-dark .btn.strong.is-press { background-image: linear-gradient(rgba(0,0,0,.12), rgba(0,0,0,.12)); }
 
+/* the live quiet timer, under the countdown */
+.quietl { margin: -4px 0 0; text-align: center; color: var(--q-ink2); font: 600 var(--q-t-t3)/1.2 var(--q-ui); font-variant-numeric: tabular-nums; }
+.quietl b { color: var(--q-ink); font-weight: 700; }
+
+/* a reminder: the Arabic is the content; its meaning opens on a tap */
+.remind { display: grid; gap: 6px; padding: 14px 16px; border-radius: var(--q-r-ctl); background: var(--q-fill); text-align: center; min-width: 0; }
+.rem { display: grid; gap: 6px; padding: 16px var(--q-row-px); text-align: center; }
+.remind .ar, .rem .ar { margin: 0; font: 400 var(--q-ar-26)/1.9 var(--q-ar); overflow-wrap: anywhere; }
+.ref { margin: 0; color: var(--q-ink3); font-size: var(--q-t-min); }
+.ref .arn { font: 400 20px/1.2 var(--q-ar); }
+.mean { margin: 0; color: var(--q-ink2); font-size: var(--q-t-min); line-height: 1.45; text-align: start; }
+.remind .btn.plain, .rem .btn.plain { justify-self: center; font-size: var(--q-t-min); }
+
+/* one switch: a yes/no is a row with a switch, and the whole row is the target */
+.sw { position: relative; width: 51px; height: 31px; flex: none; border-radius: var(--q-r-cap); background: var(--q-track); transition: background 300ms var(--q-ease); }
+.sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: var(--q-r-cap); background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.22);
+  transform-origin: left center; transition: transform 320ms cubic-bezier(.3,1.3,.5,1), scale 200ms var(--q-ease); }
+[aria-checked="true"] > .sw { background: var(--q-acc); }
+[aria-checked="true"] > .sw::after { transform: translateX(20px); transform-origin: right center; }
+.is-press > .sw::after { scale: 1.22 1; }
+
+/* two-line rows, the talk vs listen bar and the budget bar */
+.row.col { flex-direction: column; align-items: stretch; gap: 8px; padding-block: 12px; }
+.tl-top { display: flex; justify-content: space-between; align-items: baseline; gap: var(--q-sp); font-size: var(--q-t-min); color: var(--q-ink2); font-variant-numeric: tabular-nums; }
+.tl-top b { color: var(--q-ink); font-weight: 700; }
+.tlbar { height: 10px; border-radius: var(--q-r-cap); background: var(--q-acc-soft); overflow: hidden; }
+.tlbar > i { display: block; height: 100%; width: 0; border-radius: var(--q-r-cap); background: var(--q-mark); transition: width 400ms var(--q-ease); }
+.tlbar.over > i { background: var(--q-danger); }
+.r2 { display: block; color: var(--q-ink3); font-size: var(--q-t-min); }
+
+/* the week: one series, columns from one baseline, the budget as a reference line; a tap names a day's value */
+.week { padding: 14px var(--q-row-px) 12px; display: grid; gap: 10px; }
+.wk-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--q-sp); font-size: var(--q-t-min); color: var(--q-ink2); }
+.wk-head b { color: var(--q-ink); font-variant-numeric: tabular-nums; }
+.wk-plot { position: relative; height: 128px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: end; border-bottom: 1px solid var(--q-hair); }
+.wk-col { position: relative; height: 100%; display: flex; align-items: flex-end; justify-content: center; border: 0; padding: 0; background: none; border-radius: var(--q-r-icon); }
+.wk-plot.touched .wk-col[aria-pressed="true"] { background: var(--q-press); } /* the band only once a day is tapped, so it never reads as data */
+.wk-bar { display: block; width: min(24px, 60%); border-radius: 4px 4px 0 0; background: var(--q-mark); }
+.wk-bar.none { height: 0 !important; }
+.wk-budget { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid var(--q-ink3); pointer-events: none; z-index: 1; }
+.wk-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); text-align: center; color: var(--q-ink3); font-size: var(--q-t-min); }
+.wk-days .today { color: var(--q-ink); font-weight: 700; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+
+/* empty state */
+.empty { display: grid; justify-items: center; gap: 6px; padding: 28px 24px; text-align: center; color: var(--q-ink3); font-size: var(--q-t-min); }
+.empty b { color: var(--q-ink); font-size: var(--q-t-body); }
+.tile.soft { background: var(--q-acc-soft); color: var(--q-acc); }
+
+/* the card board */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.cardb { min-height: 72px; padding: 12px 16px; border: 0; border-radius: var(--q-r-ctl); background: var(--q-fill); color: var(--q-ink); font: 600 var(--q-t-body)/1.25 var(--q-ui); text-align: center; overflow-wrap: anywhere; }
+.cardb.ar { font: 400 24px/1.5 var(--q-ar); }
+.cards.editing .cardb.custom { box-shadow: inset 0 0 0 2px var(--q-danger); }
+.cards.editing .cardb:not(.custom) { opacity: .45; }
+.typebox { display: flex; gap: var(--q-sp); }
+
+/* showing a card or the sign: the whole screen, big type, turned around for the person across the table */
+.showv { position: fixed; inset: 0; z-index: 44; display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 20px; background: var(--q-page);
+  padding: max(24px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
+  opacity: 0; transition: opacity 240ms var(--q-ease); }
+.showv.show { opacity: 1; }
+.show-body { display: grid; align-content: center; justify-items: center; gap: 18px; text-align: center; min-height: 0; overflow: auto; transition: transform 420ms var(--q-ease); }
+.showv.turned .show-body { transform: rotate(180deg); }
+.show-text { margin: 0; font: 800 clamp(40px, 9vw, 112px)/1.1 var(--q-ui); letter-spacing: -.02em; max-width: 18ch; overflow-wrap: anywhere; text-wrap: balance; }
+.show-text.ar { font: 400 clamp(48px, 10vw, 120px)/1.5 var(--q-ar); letter-spacing: 0; }
+.show-sub { margin: 0; color: var(--q-ink2); font: 600 clamp(20px, 3.4vw, 34px)/1.3 var(--q-ui); max-width: 28ch; text-wrap: balance; }
+.show-bar { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--q-sp); }
+.show-bar .btn.strong { min-width: 140px; }
+.tile.big { width: 88px; height: 88px; border-radius: var(--q-r-group); } .tile.big .ic { width: 44px; height: 44px; }
+
+/* the end-of-session sheet */
+.field.area { min-height: 96px; padding: 12px 14px; resize: vertical; line-height: 1.4; width: 100%; }
+.summary { display: grid; gap: 6px; padding: 14px 16px; border-radius: var(--q-r-ctl); background: var(--q-acc-soft); }
+.summary b { color: var(--q-acc); font-size: var(--q-t-min); }
+.summary p { margin: 0; white-space: pre-wrap; }
+.sheet .cap { padding: 0 4px; }
+.sheet.paged { background: var(--q-page); } /* a sheet that holds grouped lists sits on the page tone, as the page does */
+#txtScrim { z-index: 47; } #txtPanel { z-index: 48; }
+
 @media (prefers-reduced-motion: reduce) {
+  .showv, .show-body, .tlbar > i, .sw, .sw::after { transition: opacity 150ms linear !important; } /* overrides the springs: Reduce Motion is a 150 ms fade */
   .sheet, .asheet, .toast, .seg .th, .pressable { transition: opacity 150ms linear !important; } /* overrides the springs: Reduce Motion is a 150 ms fade */
   .sheet, .asheet { transform: none !important; } /* overrides the rise: Reduce Motion fades in place */
   .sheet:not(.show), .asheet:not(.show) { opacity: 0; }
@@ -192,6 +274,11 @@ html.ql body.theme-dark .btn.strong.is-press { background-image: linear-gradient
   <symbol id="i-chip" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5"/><path d="M9 2.5v3M15 2.5v3M9 18.5v3M15 18.5v3M2.5 9h3M2.5 15h3M18.5 9h3M18.5 15h3"/></symbol>
   <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
   <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-card" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M7 10h10M7 14h6"/></symbol>
+  <symbol id="i-sign" viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="11" rx="2"/><path d="M12 14.5v6M8.5 20.5h7M8 9h8"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H14a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z"/></symbol>
+  <symbol id="i-speak" viewBox="0 0 24 24"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+  <symbol id="i-turn" viewBox="0 0 24 24"><path d="M4.5 10.5a8 8 0 0 1 14-3.5l1.5 1.5"/><path d="M20 4v4.5h-4.5"/><path d="M19.5 13.5a8 8 0 0 1-14 3.5L4 15.5"/><path d="M4 20v-4.5h4.5"/></symbol>
 </svg>
 <main class="win">
   <header class="head">
@@ -202,28 +289,65 @@ html.ql body.theme-dark .btn.strong.is-press { background-image: linear-gradient
 
   <section class="card glass" aria-label="Session">
     <div id="readout" class="hero">30:00</div>
+    <p id="quietLine" class="quietl" aria-live="off" hidden>Quiet for <b id="quietFor">0:00</b></p>
     <div id="live" class="live" data-state="off" aria-live="polite"><span class="dot"></span><span id="liveText">Loading</span></div>
     <div class="meter" aria-hidden="true"><i id="level"></i></div>
+    <div class="seg" id="kindSeg" role="radiogroup" aria-label="Kind of session"></div>
     <div class="actions">
       <button id="go" class="btn strong" type="button">Start silence</button>
       <button id="test" class="btn glass" type="button">Test without echo</button>
+      <button id="pass" class="btn glass" type="button" hidden>Talk freely, 10 s</button>
     </div>
+    <div id="remind" class="remind" hidden></div>
     <p id="note" class="note" role="alert" hidden></p>
+  </section>
+
+  <section class="sec" aria-labelledby="capQuiet">
+    <h2 class="cap" id="capQuiet">Without your voice</h2>
+    <div class="group">
+      <button class="row gl" id="openCards" type="button"><svg class="ic"><use href="#i-card"/></svg><span class="rt">Show a card</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+      <button class="row gl" id="openSign" type="button"><svg class="ic"><use href="#i-sign"/></svg><span class="rt">In-silence sign</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+      <button class="row gl" id="openRemind" type="button"><svg class="ic"><use href="#i-book"/></svg><span class="rt">Reminders</span><span class="rv" id="remindStatus">On</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+    </div>
+    <p class="foot">A card or the sign fills the screen for the person you're with. Speak reads a card out loud through the iPad's speaker, so take your headphones off first or only you will hear it.</p>
   </section>
 
   <section class="sec" aria-labelledby="capSession">
     <h2 class="cap" id="capSession">This session</h2>
     <div class="group">
-      <div class="row"><span class="rt">Times you talked</span><span class="rv" id="cTalk">0</span></div>
-      <div class="row"><span class="rt">Time talking</span><span class="rv" id="cTalkSec">0 s</span></div>
+      <div class="row col"><div class="tl-top"><span>You <b id="tlMe">0%</b></span><span>Others <b id="tlOth">0%</b></span></div><div class="tlbar" aria-hidden="true"><i id="tlBar"></i></div></div>
+      <div class="row"><span class="rt">Times echoed</span><span class="rv" id="cTalk">0</span></div>
+      <div class="row"><span class="rt">Talk time</span><span class="rv" id="cTalkTime">0:00</span></div>
       <div class="row"><span class="rt">Phrases passed</span><span class="rv" id="cPass">0</span></div>
       <div class="row"><span class="rt">Short replies</span><span class="rv" id="cShort">0</span></div>
       <div class="row"><span class="rt">Others ignored</span><span class="rv" id="cOther">0</span></div>
+      <div class="row"><span class="rt">Talked over someone</span><span class="rv" id="cInt">0</span></div>
+      <div class="row" id="nudgeRow" hidden><span class="rt">Nudges</span><span class="rv" id="cNudge">0</span></div>
     </div>
     <div id="last" class="group" hidden>
       <div class="row"><span class="rt">Last</span><span class="rv wrap" id="lastText"></span></div>
       <div class="row btns"><button id="wasMe" class="btn plain" type="button">That was me</button><button id="notMe" class="btn plain" type="button">Not me</button></div>
     </div>
+    <p class="foot">You and Others: how much of the talking Samt heard was you. Talk time is your talking, not counting the phrases that pass.</p>
+  </section>
+
+  <section class="sec" aria-labelledby="capToday">
+    <h2 class="cap" id="capToday">Today</h2>
+    <div class="group">
+      <div class="row col"><div class="tl-top"><span>Talk time <b id="todayTalk">0:00</b> of <span id="todayBudget">20:00</span></span><span id="todayLeft">20:00 left</span></div><div class="tlbar" id="budgetTrack" aria-hidden="true"><i id="budgetBar"></i></div></div>
+      <div class="row"><span class="rt" id="budgetLabel">Daily talk budget</span><div class="stp" role="group" aria-labelledby="budgetLabel"><button id="budgetDown" type="button" aria-label="Smaller budget">−</button><output id="budgetOut">20 min</output><button id="budgetUp" type="button" aria-label="Bigger budget">+</button></div></div>
+      <div class="row"><span class="rt">Days within budget</span><span class="rv" id="streak">0</span></div>
+    </div>
+    <div class="group week">
+      <div class="wk-head"><span>Talk time, last 7 days</span><span id="weekSel"></span></div>
+      <div class="wk-plot" id="weekPlot" data-nopress><div class="wk-budget" id="weekBudget"></div></div>
+      <div class="wk-days" id="weekDays" aria-hidden="true"></div>
+      <table class="sr" id="weekTable"></table>
+    </div>
+    <p class="foot">The line across the chart is your daily budget. Tap a day to see its talk time.</p>
+    <h2 class="cap" id="capHist">Past sessions</h2>
+    <div class="group" id="histList"></div>
+    <p class="foot">Light and Neural on this device share the budget and the past sessions.</p>
   </section>
 
   <section class="sec" aria-labelledby="capTimer">
@@ -233,6 +357,17 @@ html.ql body.theme-dark .btn.strong.is-press { background-image: linear-gradient
       <div class="row"><span class="rt" id="minsLabel">Minutes</span><div class="stp" role="group" aria-labelledby="minsLabel"><button id="minsDown" type="button" aria-label="Fewer minutes">−</button><output id="minsOut">30</output><button id="minsUp" type="button" aria-label="More minutes">+</button></div></div>
       <div class="row"><label class="rt" for="until">Until a time</label><button id="clearUntil" class="btn plain" type="button" hidden>Clear</button><input id="until" class="field" type="time"></div>
     </div>
+  </section>
+
+  <section class="sec" aria-labelledby="capConv">
+    <h2 class="cap" id="capConv">Conversation</h2>
+    <div class="group">
+      <div class="row"><span class="rt" id="limitLabel">Talk before the echo</span><div class="stp" role="group" aria-labelledby="limitLabel"><button id="limitDown" type="button" aria-label="Less talk">−</button><output id="limitOut">15 s</output><button id="limitUp" type="button" aria-label="More talk">+</button></div></div>
+      <button class="row" id="swInterrupt" type="button" role="switch" aria-checked="true"><span class="rt">No interrupting</span><span class="sw" aria-hidden="true"></span></button>
+      <button class="row" id="swNudge" type="button" role="switch" aria-checked="true"><span class="rt">Nudge before the echo</span><span class="sw" aria-hidden="true"></span></button>
+    </div>
+    <p class="foot">For Conversation sessions. Each turn you can talk this long before the echo starts. A new turn begins when someone else speaks, or when you stay quiet for a second and a half.</p>
+    <p class="foot">No interrupting: talking over someone starts the echo at once. Nudge: a soft two-note tone in your headphones about 2½ seconds before the echo.</p>
   </section>
 
   <section class="sec" aria-labelledby="capTeach">
@@ -291,7 +426,7 @@ html.ql body.theme-dark .btn.strong.is-press { background-image: linear-gradient
   <section class="sec">
     <div class="group"><button class="row danger" id="resetAll" type="button">Erase Samt's setup on this device</button></div>
     <p class="foot">Wear headphones, or the speaker feeds back into the mic. Keep Samt open and in front while it runs; iPadOS stops the mic in the background. Don't use it at the ramp or jetbridge, or while driving.</p>
-    <p class="foot">Everything stays on this device. Your voice profile and phrases are saved in this browser only.</p>
+    <p class="foot">Your voice, the audio and your setup stay on this device, saved in this browser only. When you ask Claude for a summary, that session's numbers, your mood and your note are sent to Claude, and nothing else.</p>
     <p class="foot" id="storeWarn" hidden>This browser won't keep Samt's setup (Private Browsing or blocked storage), so it will be lost when you close the page.</p>
     {{FOOT_EXTRA}}
   </section>
@@ -309,6 +444,61 @@ html.ql body.theme-dark .btn.strong.is-press { background-image: linear-gradient
   </div>
 </div>
 
+<div id="cardsScrim" class="scrim" hidden></div>
+<div id="cardsPanel" class="sheet" role="dialog" aria-modal="true" aria-labelledby="cardsTitle" hidden>
+  <div class="sheet-head"><h2 id="cardsTitle">Show a card</h2><button id="cardsEdit" class="btn plain" type="button">Edit</button><button id="cardsClose" class="round" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
+  <div id="cardGrid" class="cards"></div>
+  <form id="cardForm" class="typebox"><input id="cardText" class="field grow" type="text" maxlength="120" placeholder="Or type something" aria-label="Text to show" autocomplete="off"></form>
+  <div class="actions">
+    <button id="cardShowTyped" class="btn strong" type="button">Show</button>
+    <button id="cardSpeakTyped" class="btn glass" type="button"><svg class="ic"><use href="#i-speak"/></svg>Speak</button>
+    <button id="cardSaveTyped" class="btn glass" type="button">Save as a card</button>
+  </div>
+  <p id="cardsHint" class="hint" hidden>Tap a card you made to delete it. The others stay.</p>
+</div>
+
+<div id="remScrim" class="scrim" hidden></div>
+<div id="remPanel" class="sheet paged" role="dialog" aria-modal="true" aria-labelledby="remTitle" hidden>
+  <div class="sheet-head"><h2 id="remTitle">Reminders</h2><button id="remClose" class="round" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
+  <div class="group"><button class="row" id="swRemind" type="button" role="switch" aria-checked="true"><span class="rt">Show one when a session starts</span><span class="sw" aria-hidden="true"></span></button></div>
+  <div id="remList" class="sec"></div>
+  <p class="hint" id="remSource"></p>
+</div>
+
+<div id="endScrim" class="scrim" hidden></div>
+<div id="endPanel" class="sheet paged" role="dialog" aria-modal="true" aria-labelledby="endTitle" hidden>
+  <div class="sheet-head"><h2 id="endTitle">Session done</h2><button id="endClose" class="round" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
+  <div class="group" id="endStats"></div>
+  <h3 class="cap" id="capMood">How did it go?</h3>
+  <div class="seg" id="moodSeg" role="radiogroup" aria-labelledby="capMood"></div>
+  <textarea id="endNote" class="field area" maxlength="300" placeholder="A note for yourself (optional)" aria-label="A note for yourself"></textarea>
+  <button id="askClaude" class="btn glass" type="button">Ask Claude for a summary</button>
+  <div id="endSummary" class="summary" hidden><b>Claude</b><p id="endSummaryText"></p></div>
+  <p class="hint" id="claudeHint">Sends this session's numbers, your mood and your note to Claude. Your voice and the audio stay on this device.</p>
+  <div class="actions"><button id="endDone" class="btn strong" type="button">Done</button><button id="endDelete" class="btn plain" type="button" hidden>Delete this session</button></div>
+</div>
+
+<div id="showView" class="showv" role="dialog" aria-modal="true" aria-label="Shown to the person you're with" hidden>
+  <div class="show-body">
+    <span class="tile big" id="showGlyph" aria-hidden="true" hidden><svg class="ic"><use href="#i-hush"/></svg></span>
+    <p id="showText" class="show-text"></p>
+    <p id="showSub" class="show-sub" hidden></p>
+  </div>
+  <div class="show-bar">
+    <button id="showSpeak" class="btn glass" type="button"><svg class="ic"><use href="#i-speak"/></svg>Speak</button>
+    <button id="showWords" class="btn glass" type="button" hidden>Change the words</button>
+    <button id="showTurn" class="btn glass" type="button"><svg class="ic"><use href="#i-turn"/></svg>Turn around</button>
+    <button id="showClose" class="btn strong" type="button">Close</button>
+  </div>
+</div>
+
+<div id="txtScrim" class="scrim" hidden></div>
+<div id="txtPanel" class="sheet" role="dialog" aria-modal="true" aria-labelledby="txtTitle" hidden>
+  <div class="sheet-head"><h2 id="txtTitle"></h2><button id="txtClose" class="round" type="button" aria-label="Cancel"><svg class="ic"><use href="#i-close"/></svg></button></div>
+  <form id="txtForm"><input id="txtField" class="field" style="width:100%" type="text" maxlength="80" autocomplete="off" aria-labelledby="txtTitle"></form>
+  <div class="actions"><button id="txtSave" class="btn strong" type="button">Save</button></div>
+</div>
+
 <div id="actScrim" class="scrim" hidden></div>
 <div id="actSheet" class="asheet" role="dialog" aria-modal="true" aria-labelledby="actTitle" hidden>
   <div class="group"><div class="msg"><b id="actTitle"></b><span id="actMsg"></span></div><div id="actRows"></div></div>
@@ -316,7 +506,7 @@ html.ql body.theme-dark .btn.strong.is-press { background-image: linear-gradient
 </div>
 <div id="toast" class="toast" role="status"></div>
 
-<script>window.SAMT_MODE = {{MODE_JSON}}; window.SAMT_CONFIG = {{CONFIG_JSON}};</script>
+<script>window.SAMT_MODE = {{MODE_JSON}}; window.SAMT_CONFIG = {{CONFIG_JSON}}; window.SAMT_REMINDERS = {{REMINDERS_JSON}};</script>
 <script>
 {{SCRIPTS}}
 </script>

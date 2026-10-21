@@ -24,12 +24,18 @@ def read(*p):
     with open(os.path.join(SRC, *p), encoding="utf-8") as f:
         return f.read()
 
+# Reminders: Qur'an verses (Tanzil Uthmani, NFC) and hadith (sunnah.com), checked before they were added.
+# Never edit their Arabic by hand; it is embedded exactly as stored.
+REMINDERS = json.dumps(json.loads(read("reminders.json")), ensure_ascii=False)
+REMINDERS = REMINDERS.replace("</", "<\\/").replace("\u2028", "\\u2028").replace("\u2029", "\\u2029")
+
 tpl = read("template.html")
 for mode, p in PAGES.items():
     html = tpl
     for k in ("TITLE", "TIER", "SUB", "HEAD_EXTRA", "FOOT_EXTRA"):
         html = html.replace("{{%s}}" % k, p[k])
     html = html.replace("{{MODE_JSON}}", json.dumps(mode)).replace("{{CONFIG_JSON}}", json.dumps(p["CONFIG"]))
+    html = html.replace("{{REMINDERS_JSON}}", REMINDERS)
     js = "\n".join(read(n + ".js") for n in p["files"]).replace("</script", "<\\/script")
     html = html.replace("{{SCRIPTS}}", js)
     assert "{{" not in html, f"unfilled placeholder in {mode}"
