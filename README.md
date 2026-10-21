@@ -32,10 +32,12 @@ Gateway, which injects the credentials, so no key is stored anywhere. The model 
 ## Reminders
 
 `src/reminders.json` holds the verses and hadith. Qur'an text: Tanzil Project, Uthmani text v1.1 (tanzil.net),
-NFC-normalised, CC BY 3.0 (verbatim copies only, credit Tanzil and link to tanzil.net). English: Pickthall (1930), as
-Tanzil hosts it (non-commercial use). Hadith: wording, numbers and grades from sunnah.com, cross-checked letter for
-letter against an independent sunnah.com dataset; the "In plain words" meanings are short renderings, not a
-published translation. Never edit the Arabic by hand.
+NFC-normalised, CC BY 3.0 (verbatim copies only, credit Tanzil and link to tanzil.net), byte for byte the copy Hifz Hub
+pins (`site/mithlayn-assets/mushaf-data/quran_tanzil_uthmani.json` in Repo-1, tatweel off). English: Pickthall (1930),
+as Tanzil hosts it (non-commercial use). Hadith: wording, numbers and grades from sunnah.com, cross-checked letter for
+letter against an independent sunnah.com dataset; an-Nawawi's Forty no. 12 is given with an-Nawawi's own grading
+(hasan), while sunnah.com grades at-Tirmidhi's narration of it (2317) da'if. The "In plain words" meanings are short
+renderings, not a published translation. Never edit the Arabic by hand.
 
 ## Deploy
 
