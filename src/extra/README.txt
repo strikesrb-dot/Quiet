@@ -1,4 +1,4 @@
-Samt v3
+Samt v4
 =======
 
 Samt is already online at https://samt-quiet.netlify.app. This zip is a copy of
@@ -9,7 +9,7 @@ not from the Files app.
 
 Putting this copy online by hand with Netlify:
 1. In Safari on the iPad, sign in at app.netlify.com.
-2. Add new site > Deploy manually, then tap the upload area and pick samt-v3.zip.
+2. Add new site > Deploy manually, then tap the upload area and pick samt-v4.zip.
 3. Open the site's link in Safari and choose Samt Light or Samt Neural.
 4. Tap a start button and allow the microphone.
 5. Optional: Share > Add to Home Screen. Safari then won't clear your setup
