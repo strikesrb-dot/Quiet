@@ -55,17 +55,27 @@ export default async (req: Request, context: Context) => {
   try { body = JSON.parse(raw); } catch { return reply(400, { error: "That request wasn't readable." }); }
   const data = clean(body);
   const client = new Anthropic({ timeout: 25_000, maxRetries: 1 }); // credentials from the gateway; well inside the 60 s limit
-  const ask = (model: string) => client.messages.create({
-    model, max_tokens: 400, system: SYSTEM,
-    messages: [{ role: "user", content: "Here is the session. Write the note.\n\n" + JSON.stringify(data) }],
-  });
+  const content = "Here is the session. Write the note.\n\n" + JSON.stringify(data);
+  // A short note needs no extended thinking, and thinking would count against max_tokens. If a model won't take
+  // thinking "disabled", ask again without that option and with room for its thinking.
+  const ask = async (model: string) => {
+    try {
+      return await client.messages.create({ model, max_tokens: 600, system: SYSTEM, thinking: { type: "disabled" }, messages: [{ role: "user", content }] });
+    } catch (e: any) {
+      if (e?.status !== 400 || !/thinking/i.test(String(e?.message))) throw e;
+      return await client.messages.create({ model, max_tokens: 4000, system: SYSTEM, messages: [{ role: "user", content }] });
+    }
+  };
   const wanted = Netlify.env.get("SAMT_MODEL") || MODEL;
   try {
     let msg;
     try { msg = await ask(wanted); }
-    catch (e: any) { if (e?.status === 404 || e?.status === 400) msg = await ask(FALLBACK); else throw e; }
+    catch (e: any) { if (e?.status === 404 || (e?.status === 400 && /model/i.test(String(e?.message)))) msg = await ask(FALLBACK); else throw e; }
     const summary = msg.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
-    if (!summary) return reply(502, { error: "Claude didn't write anything. Try again." });
+    if (!summary) {
+      console.error("summary empty", context.requestId, msg.model, msg.stop_reason, msg.content.map((b: any) => b.type).join(","));
+      return reply(502, { error: "Claude didn't write anything. Try again.", stop: msg.stop_reason });
+    }
     return reply(200, { summary: summary.slice(0, 1500), model: msg.model });
   } catch (e: any) {
     console.error("summary failed", context.requestId, e?.status, e?.message);
