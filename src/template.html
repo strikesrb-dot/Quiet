@@ -294,8 +294,8 @@ body.in-session { --q-page: color-mix(in srgb, var(--q-acc) 9%, #f9f9f7); }
 html.ql body.theme-dark.in-session { --q-page: color-mix(in srgb, var(--q-acc) 12%, #20201f); }
 body:not([data-view="home"]) #appHead { display: none; } /* a page shows its own Back and title; a session shows only itself */
 body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a session's tint) fills the screen when the content is short */
-.session { gap: 16px; }
-.s-top { display: flex; justify-content: space-between; align-items: center; gap: var(--q-sp); min-height: var(--tap); }
+.session { gap: var(--q-sp); }
+.s-top { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; column-gap: 16px; row-gap: 4px; margin-top: -4px; }
 .s-kind { display: inline-flex; align-items: center; gap: 8px; color: var(--q-acc); font: 800 var(--q-t-min)/1 var(--q-ui); letter-spacing: .06em; text-transform: uppercase; }
 .s-kind::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--q-acc); }
 .session .quietl { margin: 0; font-size: var(--q-t-body); }
@@ -316,7 +316,7 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
 .ic.up { width: 16px; height: 16px; transform: rotate(-90deg); }
 
 /* setup, step by step: a five-part bar for where you are (done in clay, this step in ink), one step's card at a time */
-.wz-bar { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-top: -8px; }
+.wz-bar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: -8px; }
 .wz-bar > i { height: 6px; border-radius: var(--q-r-cap); background: var(--q-fill); transition: background-color 300ms var(--q-ease); }
 .wz-bar > i[data-s="done"] { background: var(--q-acc); }
 .wz-bar > i[data-s="skipped"] { background: var(--q-acc-soft); }
@@ -328,6 +328,17 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
 .wz-sumt { padding: 0 var(--q-row-px); }
 .wz-nav { display: flex; align-items: center; min-height: var(--tap); margin-top: -12px; }
 .wz-nav #wzNext { margin-inline-start: auto; }
+
+/* Sound level: − / + beside the live pill move the line on the level bar; the bar turns dark while it's over the line */
+.s-live { display: grid; grid-template-columns: var(--tap) minmax(0, 1fr) var(--tap); align-items: center; gap: var(--q-sp); }
+.s-live .live { grid-column: 2; justify-self: center; }
+.s-live #lineUp { grid-column: 3; }
+.lvwrap { position: relative; min-width: 0; }
+.linemark { position: absolute; top: -8px; bottom: -8px; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--q-ink); pointer-events: none; }
+body.lv-mode .lvwrap .meter { height: 10px; }
+.meter > i { transition: background-color 120ms linear; }
+.meter.over > i { background: var(--q-strong); }
+#muteScrim { z-index: 42; } #mutePanel { z-index: 43; } /* above a session's Details sheet, which opens it; under the action sheet that confirms Unmute */
 
 @media (prefers-reduced-motion: reduce) {
   .showv, .show-body, .tlbar > i, .sw, .sw::after { transition: opacity 150ms linear !important; } /* overrides the springs: Reduce Motion is a 150 ms fade */
@@ -356,6 +367,8 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
   <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-turn" viewBox="0 0 24 24"><path d="M4.5 10.5a8 8 0 0 1 14-3.5l1.5 1.5"/><path d="M20 4v4.5h-4.5"/><path d="M19.5 13.5a8 8 0 0 1-14 3.5L4 15.5"/><path d="M4 20v-4.5h4.5"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M6 12h12M12 6v12"/></symbol>
   <symbol id="i-steps" viewBox="0 0 24 24"><path d="M3.5 6.5l1.7 1.7 3-3.2M3.5 12.5l1.7 1.7 3-3.2"/><circle cx="5.5" cy="18.5" r="1.7"/><path d="M11.5 7h9M11.5 13h9M11.5 18.5h9"/></symbol>
 </svg>
 <main class="win">
@@ -369,7 +382,7 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
   <section id="vHome" class="view" aria-label="Home">
     <section id="setupCard" class="card glass" aria-labelledby="setupTitle" hidden>
       <h2 class="ctitle" id="setupTitle">Set up Samt</h2>
-      <p class="cbody">Five short steps, about 5 minutes: your voice, the echo, other voices, a check that Samt can tell you apart, and phrases. Wear the headphones you'll use.</p>
+      <p class="cbody">Four short steps, about 4 minutes: your voice, the echo, other voices, and a check that Samt can tell you apart. Wear the headphones you'll use.</p>
       <p class="cstatus" id="setupModel" hidden></p>
       <button id="setupStart" class="btn strong" type="button">Start setup</button>
       <p class="cnote">Sessions open once Samt knows your voice. Cards, the sign and reminders work now.</p>
@@ -380,6 +393,7 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
       <p class="cnote center" id="lenHint">Tap the time to change it</p>
       <div class="seg" id="kindSeg" role="radiogroup" aria-label="Kind of session"></div>
       <button id="convLine" class="btn plain small" type="button" hidden></button>
+      <div class="seg" id="whoSeg" role="radiogroup" aria-label="What turns the echo on"></div>
       <button id="go" class="btn strong" type="button">Start silence</button>
       <button id="test" class="btn glass" type="button">Test without echo</button>
       <p class="today" id="todayLine"></p>
@@ -399,10 +413,16 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
 
   <!-- SESSION: only what a running session needs; the rest of the app waits until it ends -->
   <section id="vSession" class="view session" aria-label="Session" hidden>
-    <div class="s-top"><span id="sKind" class="s-kind">Silence</span><span id="quietLine" class="quietl">Quiet for <b id="quietFor">0:00</b></span></div>
+    <div class="seg" id="sWhoSeg" role="radiogroup" aria-label="What turns the echo on"></div>
     <div id="sReadout" class="hero" role="timer" aria-label="Time left">30:00</div>
-    <div id="live" class="live" data-state="off" aria-live="polite"><span class="dot"></span><span id="liveText">Listening</span></div>
-    <div class="meter" aria-hidden="true"><i id="level"></i></div>
+    <div class="s-top"><span id="sKind" class="s-kind">Silence</span><span id="quietLine" class="quietl">Quiet for <b id="quietFor">0:00</b></span></div>
+    <!-- the live pill; with Sound level, − / + beside it move the line on the level bar (the bar turns dark over the line) -->
+    <div class="s-live">
+      <button id="lineDown" class="round" type="button" aria-label="Lower the line" hidden><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg></button>
+      <div id="live" class="live" data-state="off" aria-live="polite"><span class="dot"></span><span id="liveText">Listening</span></div>
+      <button id="lineUp" class="round" type="button" aria-label="Raise the line" hidden><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></button>
+    </div>
+    <div class="lvwrap"><div class="meter" aria-hidden="true"><i id="level"></i></div><span id="lineMark" class="linemark" aria-hidden="true" hidden></span><span id="lineSr" class="sr" aria-live="polite"></span></div>
     <div id="remind" class="remind" hidden></div>
     <button id="resume" class="btn strong" type="button" hidden>Resume</button>
     <button id="pass" class="btn glass" type="button">Talk freely, 10 s</button>
@@ -425,7 +445,7 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
         <div class="row"><span class="rt" id="budgetLabel">Daily talk budget</span><div class="stp" role="group" aria-labelledby="budgetLabel"><button id="budgetDown" type="button" aria-label="Smaller budget">−</button><output id="budgetOut">20 min</output><button id="budgetUp" type="button" aria-label="Bigger budget">+</button></div></div>
         <div class="row"><span class="rt">Days within budget</span><span class="rv" id="streak">0</span></div>
       </div>
-      <p class="foot">Talk time is your talking, not counting the phrases that pass.</p>
+      <p class="foot">Talk time is the talking Samt counted as yours. With Sound level, that's all talk over the line.</p>
     </section>
     <section class="sec" aria-label="The last 7 days">
       <div class="group week">
@@ -453,7 +473,6 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
         <button class="row gl" id="toWizard" type="button"><svg class="ic"><use href="#i-steps"/></svg><span class="rt">Step-by-step setup</span><span class="rv" id="wizStatus"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
         <button class="row gl" id="teachVoice" type="button"><svg class="ic"><use href="#i-mic"/></svg><span class="rt">Your voice</span><span class="rv" id="voiceStatus">Not taught</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
         <button class="row gl" id="teachOthers" type="button"><svg class="ic"><use href="#i-people"/></svg><span class="rt">Other voices</span><span class="rv" id="othStatus">Recommended</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
-        <button class="row gl" id="toPhrases" type="button"><svg class="ic"><use href="#i-hush"/></svg><span class="rt">Phrases that pass</span><span class="rv" id="phrCount"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
       </div>
     </section>
     <section class="sec" aria-labelledby="capSess">
@@ -462,6 +481,7 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
         <button class="row" id="toConv" type="button"><span class="rt">Conversation</span><span class="rv" id="convStatus"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
         <button class="row" id="toEcho" type="button"><span class="rt">Echo</span><span class="rv" id="echoStatus"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
         <button class="row" id="toMatch" type="button"><span class="rt">Matching</span><span class="rv" id="matchStatus"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+        <button class="row" id="toMute" type="button"><span class="rt">Muted sounds</span><span class="rv" id="muteStatus"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
       </div>
     </section>
     <section class="sec" aria-labelledby="capLook">
@@ -477,25 +497,13 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
     </section>
   </section>
 
-  <!-- PHRASES (under Settings) -->
-  <section id="vPhrases" class="view" aria-labelledby="phTitle" hidden>
-    <div class="pagehead"><button class="back" type="button" data-back><svg class="ic" aria-hidden="true"><use href="#i-back"/></svg>Settings</button></div>
-    <h2 class="ptitle" id="phTitle">Phrases that pass</h2>
-    <div id="phraseList" class="sec"></div>
-    <div class="group">
-      <button class="row act" id="recordAll" type="button">Record the missing phrases</button>
-      <form id="addPhrase" class="row"><input id="newPhrase" class="field grow" type="text" maxlength="60" placeholder="Add your own phrase" aria-label="New phrase"><button class="btn plain" type="submit">Add</button></form>
-    </div>
-    <p class="foot">Say each phrase 3 times. When Samt hears one of them from you, it lets it through with no echo. Replies shorter than half a second already pass. <span id="phrStatus"></span></p>
-  </section>
-
   <!-- SETUP, STEP BY STEP (first open, and again from Settings): one step at a time, each step's result in its card -->
   <section id="vWizard" class="view" aria-labelledby="wzTitle" hidden>
     <div class="pagehead"><button class="back" type="button" data-back><svg class="ic" aria-hidden="true"><use href="#i-back"/></svg><span id="wzBack">Samt</span></button></div>
     <h2 class="ptitle" id="wzTitle">Set up Samt</h2>
-    <div class="wz-bar" id="wzBar" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="wz-bar" id="wzBar" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
     <section id="wzCard" class="card glass" aria-labelledby="wzStepTitle" aria-live="polite">
-      <p class="wz-count" id="wzCount">Step 1 of 5</p>
+      <p class="wz-count" id="wzCount">Step 1 of 4</p>
       <h3 class="ctitle" id="wzStepTitle">Your voice</h3>
       <p class="cbody" id="wzBody"></p>
       <div class="wz-res" id="wzRes" hidden>
@@ -525,7 +533,6 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
   <div class="actions">
     <button id="recResume" class="btn strong" type="button" hidden>Resume</button>
     <button id="recDone" class="btn strong" type="button">Done</button>
-    <button id="recSkip" class="btn glass" type="button" hidden>Skip</button>
   </div>
 </div>
 
@@ -605,7 +612,7 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
     <button class="row" id="swInterrupt" type="button" role="switch" aria-checked="true"><span class="rt">No interrupting</span><span class="sw" aria-hidden="true"></span></button>
     <button class="row" id="swNudge" type="button" role="switch" aria-checked="true"><span class="rt">Nudge before the echo</span><span class="sw" aria-hidden="true"></span></button>
   </div>
-  <p class="hint">Each turn you can talk this long before the echo starts. A new turn begins when someone else speaks, or when you stay quiet for a second and a half. No interrupting: talking over someone starts the echo at once. Nudge: a soft two-note tone in your headphones about 2½ seconds before the echo.</p>
+  <p class="hint">Each turn you can talk this long before the echo starts. A new turn begins when someone else speaks, or when you stay quiet for a second and a half. No interrupting: talking over someone starts the echo at once (Your voice only: Sound level can't tell who is talking). Nudge: a soft two-note tone in your headphones about 2½ seconds before the echo.</p>
   <div class="actions"><button id="convDone" class="btn strong" type="button">Done</button></div>
 </div>
 
@@ -616,18 +623,20 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
     <div class="row col"><div class="tl-top"><span>You <b id="tlMe">0%</b></span><span>Others <b id="tlOth">0%</b></span></div><div class="tlbar" aria-hidden="true"><i id="tlBar"></i></div></div>
     <div class="row"><span class="rt">Talk time</span><span class="rv" id="cTalkTime">0:00</span></div>
     <div class="row"><span class="rt">Times echoed</span><span class="rv" id="cTalk">0</span></div>
-    <div class="row"><span class="rt">Phrases passed</span><span class="rv" id="cPass">0</span></div>
-    <div class="row"><span class="rt">Short replies</span><span class="rv" id="cShort">0</span></div>
+    <div class="row" id="shortRow"><span class="rt">Short replies</span><span class="rv" id="cShort">0</span></div>
     <div class="row"><span class="rt">Others ignored</span><span class="rv" id="cOther">0</span></div>
-    <div class="row"><span class="rt">Talked over someone</span><span class="rv" id="cInt">0</span></div>
+    <div class="row" id="intRow"><span class="rt">Talked over someone</span><span class="rv" id="cInt">0</span></div>
     <div class="row" id="nudgeRow" hidden><span class="rt">Nudges</span><span class="rv" id="cNudge">0</span></div>
   </div>
   <div id="last" class="group" hidden>
     <div class="row"><span class="rt">Last</span><span class="rv wrap" id="lastText"></span></div>
     <div class="row btns"><button id="wasMe" class="btn plain" type="button">That was me</button><button id="notMe" class="btn plain" type="button">Not me</button></div>
   </div>
-  <div class="group"><div class="row"><span class="rt" id="dVolLabel">Echo volume</span><div class="stp" role="group" aria-labelledby="dVolLabel"><button id="dVolDown" type="button" aria-label="Quieter">−</button><output id="dVolOut"></output><button id="dVolUp" type="button" aria-label="Louder">+</button></div></div></div>
-  <p class="hint">You and Others: how much of the talking Samt heard was you.</p>
+  <div class="group">
+    <div class="row"><span class="rt" id="dVolLabel">Echo volume</span><div class="stp" role="group" aria-labelledby="dVolLabel"><button id="dVolDown" type="button" aria-label="Quieter">−</button><output id="dVolOut"></output><button id="dVolUp" type="button" aria-label="Louder">+</button></div></div>
+    <button class="row" id="dMute" type="button"><span class="rt">Muted sounds</span><span class="rv" id="muteStatus2"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+  </div>
+  <p class="hint" id="tlHint">You and Others: how much of the talking Samt heard was you.</p>
 </div>
 
 <div id="testScrim" class="scrim" hidden></div>
@@ -660,10 +669,21 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
   <div class="sheet-head"><h2 id="matchTitle">Matching</h2><button id="matchClose" class="round" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
   <h3 class="cap" id="capVoice">Your voice</h3>
   <div class="group"><div class="row full"><div class="seg" id="strictSeg" role="radiogroup" aria-labelledby="capVoice"></div></div></div>
-  <h3 class="cap" id="capPhrM">Phrases</h3>
-  <div class="group"><div class="row full"><div class="seg" id="psensSeg" role="radiogroup" aria-labelledby="capPhrM"></div></div></div>
-  <p class="hint">Looser catches more of your talking and passes phrases more easily. Stricter ignores other people more.</p>
+  <p class="hint">Looser catches more of your talking. Stricter ignores other people more. This is for Your voice; Sound level uses its line instead.</p>
   <div class="actions"><button id="matchDone" class="btn strong" type="button">Done</button></div>
+</div>
+
+<!-- Muted sounds: from Settings, and from a session's Details (so it sits above that sheet) -->
+<div id="muteScrim" class="scrim" hidden></div>
+<div id="mutePanel" class="sheet paged" role="dialog" aria-modal="true" aria-labelledby="muteTitle" hidden>
+  <div class="sheet-head"><h2 id="muteTitle">Muted sounds</h2><button id="muteClose" class="round" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
+  <div class="group" id="muteList" hidden></div>
+  <p class="hint" id="muteNone">None yet.</p>
+  <p class="cstatus" id="muteResult" aria-live="polite"></p>
+  <div class="meter" hidden><i id="muteProg"></i></div>
+  <div class="actions"><button id="muteGo" class="btn strong" type="button">Mute a sound</button></div>
+  <p class="hint" id="muteFull" hidden>That's the most Samt keeps. Unmute one to add another.</p>
+  <p class="hint">While the sound is going and you stay quiet, tap Mute a sound. Samt listens for 3 seconds, finds the sound's strongest pitches and cuts them from the echo and from what the line measures. It works for steady hums and whines, like a generator, a fan or an engine's whine. A roar spread over every pitch, like wind, can't be cut without cutting your voice too; raise the line above it instead.</p>
 </div>
 
 <div id="dataScrim" class="scrim" hidden></div>

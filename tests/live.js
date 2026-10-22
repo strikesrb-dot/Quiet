@@ -17,7 +17,7 @@ const BASE = 'https://samt-quiet.netlify.app', SITE = require('path').resolve(__
     const home = await page.evaluate(() => ({
       setup: !document.querySelector('#setupCard').hidden, ready: !document.querySelector('#readyCard').hidden,
       quick: [...document.querySelectorAll('#openCards, #openSign, #openRemind')].filter(b => b.offsetParent).length,
-      settingsRows: document.querySelectorAll('#vSettings .row').length, view: document.body.dataset.view,
+      settingsRows: document.querySelectorAll('#vSettings .row').length, view: document.body.dataset.view, who: [...document.querySelectorAll('#whoSeg button')].map(b => b.textContent).join('|'),
       reminders: (window.SAMT_REMINDERS.verses || []).length + '+' + (window.SAMT_REMINDERS.hadith || []).length,
       model: (document.querySelector('#modelStatus') || {}).textContent }));
     await page.click('#openRemind'); await page.waitForSelector('#remPanel.show');
@@ -32,7 +32,7 @@ const BASE = 'https://samt-quiet.netlify.app', SITE = require('path').resolve(__
   const chooser = await (await ctx.request.get(`${BASE}/`)).text();
   console.log('chooser same bytes:', chooser === fs.readFileSync(path.join(SITE, 'index.html'), 'utf8'));
   const page = await ctx.newPage();
-  const body = { session: { kind: 'conversation', minutes: 30, talkMin: 2.4, youPercent: 21, longestQuietMin: 11.5, echoes: 3, phrasesPassed: 4, talkedOverSomeone: 1, nudges: 2, talkFreelyTaps: 1, mood: 'okay', note: 'Quiet at lunch, harder in the meeting.' },
+  const body = { session: { kind: 'conversation', echoBy: 'sound level', minutes: 30, talkMin: 2.4, youPercent: 21, longestQuietMin: 11.5, echoes: 3, talkedOverSomeone: 0, nudges: 2, talkFreelyTaps: 1, mood: 'okay', note: 'Quiet at lunch, harder in the meeting.' },
     dailyBudgetMin: 20, last7Days: ['Thu', 'Fri', 'Sat', 'Sun', 'Mon', 'Tue', 'Wed'].map((d, i) => ({ day: d, talkMin: [0, 0, 0, 0, 0, 0, 2.4][i], sessions: i === 6 ? 1 : 0 })), daysWithinBudget: 1 };
   await page.goto(`${BASE}/light/`);
   const t0 = Date.now();

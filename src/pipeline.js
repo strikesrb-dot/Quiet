@@ -1,11 +1,14 @@
-/* Samt pipeline: Listener (features + speech detection), PhraseBook (allowed phrases),
-   Teacher (setup recordings) and Controller (live echo decisions). */
+/* Samt pipeline: Listener (features + speech detection), PhraseBook (allowed phrases; no longer offered in the app,
+   so the Controller runs without one), Teacher (setup recordings), Controller (live echo decisions by voice) and
+   LevelGate (live echo decisions by sound level). */
 (function (G) {
   'use strict';
   const S = G.Samt || (G.Samt = {});
   const { FeatureStream, VAD } = S.dsp;
   const { st, Spotter } = S.models;
   const D = 26;
+  /* A session's numbers. Both deciders add to the same object, so switching mid-session keeps them. */
+  const newCounts = () => ({ talk: 0, talkSec: 0, pass: 0, short: 0, other: 0, interrupt: 0, nudge: 0, freePass: 0, meSec: 0, otherSec: 0, talkTime: 0 });
 
   class Listener {
     constructor() { this.consumer = null; this.tmp = new Float32Array(D); this.reset(); }
@@ -147,19 +150,27 @@
       this.p = Object.assign({ minTalk: 50, contGap: 120, recheckWin: voice.kind === 'neural' ? 100 : 60, limit: 0, interrupt: false, nudge: false, nudgeGrace: 250, turnGap: 150 }, params || {});
       this.tmp = new Float32Array(D);
     }
-    start(mode) {
+    /* counts and lastMeEnd carry a session's numbers over when it switches between Your voice and Sound level. */
+    start(mode, counts, lastMeEnd) {
       this.mode = mode; this.seg = null; this.lastEnd = -1e9; this.lastEcho = false; this.segId = 0; this.history = [];
-      this.counts = { talk: 0, talkSec: 0, pass: 0, short: 0, other: 0, interrupt: 0, nudge: 0, freePass: 0, meSec: 0, otherSec: 0, talkTime: 0 };
-      this.turn = { talk: 0, lastMe: -1e9, otherAfter: false, nudged: false }; this.passUntil = -1; this.lastMeEnd = this.L.fs.nFrames; this.lastOtherEnd = -1e9;
+      this.counts = counts || newCounts();
+      this.turn = { talk: 0, lastMe: -1e9, otherAfter: false, nudged: false }; this.passUntil = -1; this.lastMeEnd = lastMeEnd != null ? lastMeEnd : this.L.fs.nFrames; this.lastOtherEnd = -1e9;
       this.spotter = new Spotter(this.book ? this.book.templates() : [], D);
       this.adaptQueue = []; this.L.consumer = this; this.on = true; this._state('listening');
     }
     stop() { if (this.seg && this.seg.echo) this._echo(false); this.on = false; this.seg = null; }
     /* The mic went away mid-speech: end the current segment now. */
     cut() { const seg = this.seg; if (!seg) return; seg.end = Math.max(seg.start, seg.next - 1); this._finish(); }
-    /* Talk freely for a while: no echo and no nudge until it runs out. */
-    pass(sec) {
-      this.passUntil = this.L.fs.nFrames + Math.round(sec * 100); this.counts.freePass++;
+    /* After the Listener restarts its frame count (a resume): its frame numbers start again from 0, so the ones kept here
+       start again too, keeping Talk freely's time left (`left`, read before the restart). */
+    resync(left) {
+      if (this.seg && this.seg.echo) this._echo(false);
+      const now = this.L.fs.nFrames; this.seg = null; this.lastEnd = -1e9; this.lastEcho = false; this.lastMeEnd = now; this.lastOtherEnd = -1e9;
+      this.passUntil = left > 0 ? now + Math.round(left * 100) : -1; this.turn = { talk: 0, lastMe: -1e9, otherAfter: false, nudged: false };
+    }
+    /* Talk freely for a while: no echo and no nudge until it runs out (quiet: carried over from a switch, not a tap). */
+    pass(sec, quiet) {
+      this.passUntil = this.L.fs.nFrames + Math.round(sec * 100); if (!quiet) this.counts.freePass++;
       if (this.seg && this.seg.echo) { this.seg.echo = false; this.counts.talk--; this.counts.talkSec += Math.max(0, this.L.fs.nFrames - this.seg.echoAt) / 100; this._echo(false); }
       this.lastEcho = false;
     }
@@ -324,5 +335,109 @@
     }
   }
 
-  S.pipeline = { Listener, PhraseBook, Teacher, Controller, DEFAULT_PHRASES };
+  /* Sound level: no voice check. Any sound over the line opens the echo at once and holds it through short dips (the
+     hold outlasts the echo's delay, so a word's end is never cut); anything under the line is ignored. It measures the
+     raw 16 kHz audio itself (push), after the muted pitches are cut, in 10 ms frames, so it answers within a few frames.
+     It opens after 30 ms over the line, so a click doesn't; the level it holds on is the last 30 ms.
+     The Listener's speech detection (onVad) only marks stretches, for the counts and the check. Same surface as the
+     Controller, so the session, Details and the check use either one. */
+  class LevelGate {
+    constructor({ listener, onEcho, onEvent, onNudge, params }) {
+      this.L = listener; this.onEcho = onEcho || (() => {}); this.onEvent = onEvent || (() => {}); this.onNudge = onNudge || (() => {});
+      this.p = Object.assign({ line: -40, hold: 35, gap: 30, limit: 0, nudge: false, nudgeGrace: 250, turnGap: 150 }, params || {});
+      this.kind = 'level'; this.level = -90; this.filters = []; this.ring = new Uint8Array(1600); this.collect = null;
+    }
+    setNotches(tones) { this.filters = (tones || []).map(t => S.dsp.notch(t.f, t.q, 16000)); }
+    start(mode, counts, lastMeEnd) {
+      this.mode = mode; this.on = true; this.f = Math.floor(this.L.fs.sTotal / 160); this.acc = 0; this.bn = 0; this.pw = [0, 0, 0];
+      this.counts = counts || newCounts();
+      this.isOpen = false; this.over = false; this.run = 0; this.lastOver = -1e9; this.st = null; this.seg = null; this.segId = 0;
+      this.turn = { talk: 0, nudged: false }; this.otherAfter = false; this.passUntil = -1;
+      this.lastMeEnd = lastMeEnd != null ? lastMeEnd : this.f; this.adaptQueue = []; this.history = [];
+      this.ring.fill(0); this.L.consumer = this; this._state('listening');
+    }
+    stop() { if (this.isOpen) this._setOpen(false, this.f); this.on = false; this.seg = null; }
+    /* The mic went away, or the session ends: close the stretch still going. */
+    cut() { if (this.seg) this._endSeg(this.f - 1); }
+    /* After the Listener restarts its frame count (a resume): count frames from there, keeping Talk freely's time left
+       (`left`, read before the restart). */
+    resync(left) {
+      if (left == null) left = this.passLeft(); if (this.isOpen) this._setOpen(false, this.f);
+      this.f = Math.floor(this.L.fs.sTotal / 160); this.acc = 0; this.bn = 0; this.pw = [0, 0, 0]; this.over = false; this.run = 0; this.under = 0;
+      this.lastOver = -1e9; this.lastMeEnd = this.f; this.passUntil = left > 0 ? this.f + Math.round(left * 100) : -1; this.seg = null; this.st = null; this.ring.fill(0);
+    }
+    pass(sec, quiet) { this.passUntil = this.f + Math.round(sec * 100); if (!quiet) this.counts.freePass++; if (this.isOpen) { this.counts.talk--; this._setOpen(false, this.f); } }
+    passLeft() { return Math.max(0, (this.passUntil - this.f) / 100); }
+    frameNow() { return this.f; }
+    talking() { return this.over; }
+    push(chunk) {
+      if (!this.on) return;
+      const F = this.filters;
+      for (let i = 0; i < chunk.length; i++) {
+        let v = chunk[i]; for (let j = 0; j < F.length; j++) v = F[j](v);
+        this.acc += v * v;
+        if (++this.bn === 160) { this._frame(this.acc / 160); this.acc = 0; this.bn = 0; }
+      }
+    }
+    _frame(power) {
+      const f = this.f++, p = this.p, pw = this.pw;
+      pw[f % 3] = power; const db = 10 * Math.log10((pw[0] + pw[1] + pw[2]) / 3 + 1e-12); this.level = db;
+      // opening takes three 10 ms frames in a row over the line on their own (30 ms of sound), so a click can't; once
+      // open, the 30 ms level keeps it open
+      const above = db >= p.line; this.run = 10 * Math.log10(power + 1e-12) >= p.line ? this.run + 1 : 0;
+      if (above && (this.over || this.run >= 3)) {
+        if (!this.over && (f - this.lastOver > p.turnGap || this.otherAfter)) { this.turn = { talk: 0, nudged: false }; this.otherAfter = false; } // a new turn
+        const add = f - this.lastOver <= p.gap ? f - this.lastOver : 1; // short dips between words count as talk
+        this.counts.talkTime += add / 100; this.counts.meSec += add / 100;
+        if (f >= this.passUntil) this.turn.talk += add;
+        this.over = true; this.lastOver = f; this.lastMeEnd = f;
+      } else if (this.over && f - this.lastOver > p.hold) this.over = false;
+      // someone under the line talked after you (half a second of it, so the quiet end of your own words doesn't count)
+      this.under = !above && !this.over && this.L.speech ? (this.under || 0) + 1 : 0;
+      if (this.under >= 50) this.otherAfter = true;
+      if (this.collect && this.L.speech && this.collect.length < 6000) this.collect.push(db);
+      this._decide(f);
+      this.ring[f % 1600] = (above ? 1 : 0) | (this.isOpen ? 2 : 0);
+      const s = this.isOpen ? 'echo' : this.over ? 'hold' : this.L.speech ? 'other' : 'listening';
+      if (s !== this.st) { this.st = s; this._state(s); }
+    }
+    /* Silence: the echo whenever it's over the line. Conversation: the turn's talk first, with a nudge before the end. */
+    _decide(f) {
+      const p = this.p, t = this.turn;
+      let want = this.over && f >= this.passUntil;
+      if (want && p.limit > 0) {
+        if (p.nudge) {
+          const at = Math.max(0, p.limit - p.nudgeGrace);
+          if (!t.nudged) { if (t.talk >= at) { t.nudged = true; this.counts.nudge++; this.onEvent({ type: 'nudge' }); if (this.mode !== 'test') this.onNudge(); } want = false; }
+          else want = t.talk >= Math.max(p.limit, at + p.nudgeGrace);
+        } else want = t.talk >= p.limit;
+      }
+      if (want !== this.isOpen) this._setOpen(want, f);
+    }
+    _setOpen(open, f) {
+      this.isOpen = open;
+      if (open) { this.counts.talk++; this.echoAt = f; } else this.counts.talkSec += Math.max(0, f - this.echoAt) / 100;
+      if (this.mode !== 'test') this.onEcho(open);
+    }
+    _state(state) { this.onEvent({ type: 'state', state }); }
+    onReady() {}
+    onVad(ev) {
+      if (!this.on) return;
+      if (ev.type === 'onset') this.seg = { id: ++this.segId, start: ev.frame, speaker: 'unknown' };
+      else if (this.seg) this._endSeg(ev.frame);
+    }
+    /* A stretch of talk ended: it was you if a quarter of it was over the line; it echoed if the echo opened in it. */
+    _endSeg(e) {
+      const g = this.seg; this.seg = null;
+      const s = Math.max(g.start, e - 1500); let n = 0, open = false;
+      for (let f = s; f <= e; f++) { const r = this.ring[f % 1600]; if (r & 1) n++; if (r & 2) open = true; }
+      const me = n >= Math.max(5, 0.25 * (e - s + 1));
+      if (!me) { this.counts.other++; this.counts.otherSec += (e - g.start + 1) / 100; }
+      const rec = { id: g.id, start: g.start, end: e, speaker: me ? 'me' : 'other', echo: open, interrupt: false, passes: [], scores: [], margins: [], embs: [] };
+      this.history.push(rec); if (this.history.length > 30) this.history.shift();
+      this.onEvent({ type: 'segment', rec, counts: this.counts });
+    }
+  }
+
+  S.pipeline = { Listener, PhraseBook, Teacher, Controller, LevelGate, DEFAULT_PHRASES };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -271,5 +271,50 @@
     }
   }
 
-  S.dsp = { makeResamplerClass, Resampler, FFT, LogMel, fbank, melBanks, makeWindow, FeatureStream, VAD, yin };
+  /* One pitch cut out (RBJ cookbook notch, the same formula as Web Audio's BiquadFilterNode 'notch', so the echo's
+     filters and the level's filters match). Q = f0 / width. Returns a per-sample function with its own state. */
+  function notch(f0, q, fs) {
+    const w = TAU * f0 / fs, al = Math.sin(w) / (2 * q), c = Math.cos(w), a0 = 1 + al;
+    const b0 = 1 / a0, b1 = -2 * c / a0, a2 = (1 - al) / a0;
+    let z1 = 0, z2 = 0;
+    return x => { const y = b0 * x + z1; z1 = b1 * x - b1 * y + z2; z2 = b0 * x - a2 * y; return y; };
+  }
+  /* x through a list of notches ([{f, q}]), as a new array. */
+  function applyNotches(x, tones, fs = 16000) {
+    const F = (tones || []).map(t => notch(t.f, t.q, fs)), y = new Float32Array(x.length);
+    for (let i = 0; i < x.length; i++) { let v = x[i]; for (let j = 0; j < F.length; j++) v = F[j](v); y[i] = v; }
+    return y;
+  }
+  /* Mean power of x in dB (like a frame's energy), skipping the first `skip` samples (filters settling). */
+  function levelDb(x, skip = 0) { let e = 0; for (let i = skip; i < x.length; i++) e += x[i] * x[i]; return 10 * Math.log10(e / Math.max(1, x.length - skip) + 1e-12); }
+  /* The steady pitches of a sound, like a machine's hum or whine: the strongest narrow peaks of its averaged spectrum,
+     at least `prom` dB over their surroundings, 50 Hz to 7 kHz. Returns up to `max` of [{f, q}], strongest first; the
+     width of each (where the peak is 10 dB down) sets its notch's Q, kept between 4 and 30. A sound spread over every
+     pitch (wind, a roar) has no such peaks and returns []. */
+  function findTones(x, { fs = 16000, n = 4096, max = 6, prom = 10 } = {}) {
+    const fft = new FFT(n), win = makeWindow('hann', n), buf = new Float32Array(n), half = n / 2, P = new Float64Array(half + 1), tmp = new Float64Array(half + 1);
+    let frames = 0;
+    for (let s = 0; s + n <= x.length; s += half) {
+      for (let i = 0; i < n; i++) buf[i] = x[s + i] * win[i];
+      fft.power(buf, n, tmp); for (let k = 0; k <= half; k++) P[k] += tmp[k]; frames++;
+    }
+    if (!frames) return [];
+    const res = fs / n, D = Array.from(P, p => 10 * Math.log10(p / frames + 1e-20));
+    const lo = Math.max(2, Math.ceil(50 / res)), hi = Math.min(half - 3, Math.floor(7000 / res)), found = [];
+    for (let k = lo; k <= hi; k++) {
+      if (!(D[k] > D[k - 1] && D[k] >= D[k + 1] && D[k] >= D[k - 2] && D[k] >= D[k + 2])) continue;
+      const w = Math.max(12, Math.round(k * 0.08)), around = D.slice(Math.max(0, k - w), Math.min(D.length, k + w + 1)).sort((a, b) => a - b);
+      if (D[k] - around[around.length >> 1] < prom) continue;
+      const den = D[k - 1] - 2 * D[k] + D[k + 1], d = den < 0 ? 0.5 * (D[k - 1] - D[k + 1]) / den : 0; // the centre, between bins
+      let a = k, b = k; while (a > lo && D[a - 1] > D[k] - 10) a--; while (b < hi && D[b + 1] > D[k] - 10) b++;
+      const f = (k + d) * res, width = Math.max(12, (b - a + 1) * res);
+      found.push({ f, q: Math.max(4, Math.min(30, f / width)), db: D[k] });
+    }
+    found.sort((p, q) => q.db - p.db);
+    const pick = [];
+    for (const c of found) { if (pick.length >= max) break; if (pick.every(p => Math.abs(p.f - c.f) > Math.max(20, 0.05 * c.f))) pick.push(c); }
+    return pick.map(({ f, q }) => ({ f: Math.round(f * 10) / 10, q: Math.round(q * 10) / 10 }));
+  }
+
+  S.dsp = { makeResamplerClass, Resampler, FFT, LogMel, fbank, melBanks, makeWindow, FeatureStream, VAD, yin, notch, applyNotches, levelDb, findTones };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

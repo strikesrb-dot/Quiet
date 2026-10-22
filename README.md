@@ -1,8 +1,10 @@
 # Samt
 
 A quiet-time aid. While it runs, your own voice comes back to you in your headphones a fraction of a second late
-(delayed auditory feedback), which makes talking very hard. It does this only for your voice, and it lets greetings,
-salam and short answers through. The listening runs on the device; no audio is uploaded.
+(delayed auditory feedback), which makes talking very hard. What turns the echo on is your choice: **Your voice** (Samt
+recognises your voice and echoes only that) or **Sound level** (any sound over a loudness line you set; with the mic
+near your mouth, your voice crosses the line and people farther away don't). The listening runs on the device; no
+audio is uploaded.
 
 - **Samt Light** (`site/light/`): one self-contained page. Tells you apart from women, children and the TV well; less
   sure against other men.
@@ -13,24 +15,49 @@ Each version keeps its own setup in the browser (IndexedDB), with a backup file 
 
 How it is laid out, by stage (Home shows only what fits where you are):
 
-- **Before your voice is taught**, Home offers one thing: Set up Samt, five steps one at a time (see below). Sessions
+- **Before your voice is taught**, Home offers one thing: Set up Samt, four steps one at a time (see below). Sessions
   open after the first step. Cards, the sign and reminders work from the start.
-- **Ready.** Home has the session length (tap the time), Silence or Conversation, Start, a test without echo, and
-  today's talk time; then three quick tools (Card, Sign, Reminders) and two rows, Progress and Settings.
-- **In a session** the screen shows only the session: time left, the "Quiet for" timer, the live pill, a reminder,
-  Talk freely, Card, Sign, and Stop, which takes a 2-second hold so it can't end by accident (a test stops with a
-  tap). Details (the numbers, a correction for the last verdict, echo volume) opens as a sheet. The browser's Back
-  can't leave a running session.
+- **Ready.** Home has the session length (tap the time), Silence or Conversation, Your voice or Sound level, Start, a
+  test without echo, and today's talk time; then three quick tools (Card, Sign, Reminders) and two rows, Progress and
+  Settings.
+- **In a session** the screen shows only the session: Your voice or Sound level (one tap switches, and the session
+  keeps its numbers), time left, the "Quiet for" timer, the live pill (with Sound level, − and + beside it move the line
+  on the level bar), a reminder, Talk freely, Card, Sign, and Stop, which takes a 2-second hold so it can't end by
+  accident (a test stops with a tap). Details (the numbers, a correction for the last verdict with Your voice, echo
+  volume, muted sounds) opens as a sheet. The browser's Back can't leave a running session.
 - **Afterwards**, the end sheet: the numbers, a mood, a note, and Claude's summary if you ask for it.
 - **Progress**: today against the daily talk budget, days within it, the last 7 days as a chart, past sessions.
   Light and Neural on one device share these.
-- **Settings** is a short index (step-by-step setup, your voice, other voices, phrases that pass; conversation, echo,
-  matching; appearance; backup and erase; about). Each row shows its value and opens on its own; nothing is deeper
-  than that.
+- **Settings** is a short index (step-by-step setup, your voice, other voices; conversation, echo, matching, muted
+  sounds; appearance; backup and erase; about). Each row shows its value and opens on its own; nothing is deeper than
+  that.
 
 Silence echoes whenever you talk. Conversation lets you talk for a while each turn (5 to 60 seconds) before the echo;
-talking over someone starts it at once; a soft two-note tone nudges you first. **Talk freely** gives you 10 seconds
-without the echo (each tap adds 10).
+talking over someone starts it at once (Your voice only); a soft two-note tone nudges you first. **Talk freely** gives
+you 10 seconds without the echo (each tap adds 10). Phrases that pass (v1 to v6) are gone: with Your voice, replies
+under half a second still never echo.
+
+## Sound level
+
+`LevelGate` in `src/pipeline.js`. No voice check: any sound over the line opens the echo at once and holds it through
+short dips (the hold is the echo's delay plus 150 ms, so a word's end is never cut); anything under it is ignored. It
+measures the raw 16 kHz audio itself in 10 ms frames, over the last 30 ms, and opens after two frames over the line, so
+a click doesn't. The line is in dB (−66 to −16, 2 dB a tap), shared by Light and Neural (`samt.shared`); until it's
+set, it starts between your setup reading and the other voices from the setup, or 10 dB under your reading. All time
+over the line counts as your talk time, and the session is marked Sound level. Samt learns nothing from it (it can't
+be sure the voice was yours). Conversation's turn time works; "talking over someone" doesn't. The setup's Check it
+step checks whichever is picked; with Sound level it can put the line halfway between your typical level and the
+others' loudest, when they're 4 dB or more apart.
+
+It works when your voice reaches the mic louder than other people's: earbuds whose mic sits near your mouth. In the
+tests (the 5-minute stream, line −24 dB), with the other voices 15 dB quieter than yours it caught all of your talk and
+ignored all of theirs; with them as loud as yours, no line split them.
+
+**Muted sounds** (Settings, or Details in a session): Samt listens for 3 seconds while a sound plays, finds its steady
+pitches (peaks at least 10 dB over their surroundings, 50 Hz to 7 kHz, up to 6) and cuts each with a notch filter, both
+in the echo (Web Audio `BiquadFilterNode`, between the delay and the gate) and in what the line measures (the same
+filters in JavaScript). Up to 4 sounds. A sound spread over every pitch (wind, a roar) has no such peaks, so nothing is
+muted and it says to raise the line instead.
 
 ## Setup, step by step
 
@@ -41,12 +68,12 @@ The first open starts it, and Settings opens it again (Step-by-step setup). One 
 3. **Other voices**: about 30 seconds of someone else talking while you stay quiet.
 4. **Check it**: you talk for about 20 seconds, then someone else does; no echo plays. Samt counts the stretches of talk
    a second or longer: yours it caught (the echo would have come on), theirs it ignored (the echo never would have, not
-   even for a moment). If it took them for you, one tap makes Matching stricter and checks again; if it missed you,
-   one tap makes it looser. Teaching more, or changing Matching, marks the last result out of date. The check only
+   even for a moment). With Your voice: if it took them for you, one tap makes Matching stricter and checks again; if
+   it missed you, one tap makes it looser. With Sound level: one tap puts the line between you, or raises or lowers it.
+   Teaching more, or changing Matching, the line or the muted sounds, marks the last result out of date. The check only
    measures: nothing from it is learned.
-5. **Phrases that pass** (optional): the greetings, thanks and short answers, 3 times each.
 
-Then a summary of the five. The steps' state is kept per version (localStorage `samt.<mode>.setup`); erasing the setup
+Then a summary of the four. The steps' state is kept per version (localStorage `samt.<mode>.setup`); erasing the setup
 starts it again.
 
 ## Claude summaries
@@ -54,6 +81,8 @@ starts it again.
 `netlify/functions/summary.mts` serves `POST /api/summary`. It calls Claude with the Anthropic SDK through Netlify AI
 Gateway, which injects the credentials, so no key is stored anywhere. The model is `claude-sonnet-5-5`; set the
 `SAMT_MODEL` environment variable (Functions scope) to change it. It is rate-limited to 6 calls a minute per visitor.
+Each request says what turned the echo on (`echoBy`: `voice` or `sound level`), so the note doesn't claim Sound level's
+talk time was all yours.
 
 ## Reminders
 

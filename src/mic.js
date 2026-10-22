@@ -1,5 +1,5 @@
 /* Samt mic: capture (AudioWorklet, ScriptProcessor fallback) resampled to 16 kHz, and the delayed echo path
-   (mic -> delay -> gate gain -> headphones). One AudioContext per page, created and resumed inside a tap (WebKit only
+   (mic -> delay -> muted pitches -> gate gain -> headphones). One AudioContext per page, created and resumed inside a tap (WebKit only
    starts audio from a user gesture). Watches for interruptions: calls, Siri, app switches, screen lock, route changes.
    Also: a test stand-in for the mic, and a small IndexedDB store that reconnects. Browser only. */
 (function (G) {
@@ -31,7 +31,7 @@ registerProcessor('samt-tap', SamtTap);
   class MicEngine {
     constructor({ onChunk, onTrouble } = {}) {
       this.onChunk = onChunk || (() => {}); this.onTrouble = onTrouble || (() => {});
-      this.delaySec = 0.2; this.vol = 1; this.open = false; this.live = false; this.path = null; this.ctx = null;
+      this.delaySec = 0.2; this.vol = 1; this.open = false; this.live = false; this.path = null; this.ctx = null; this.tones = []; this.notches = [];
     }
     /* Call FIRST and synchronously inside the tap handler, before any await. */
     prime() {
@@ -59,7 +59,7 @@ registerProcessor('samt-tap', SamtTap);
       this.src = ctx.createMediaStreamSource(this.stream);
       this.delay = ctx.createDelay(1.0); this.delay.delayTime.value = this.delaySec;
       this.gain = ctx.createGain(); this.gain.gain.value = 0;
-      this.src.connect(this.delay); this.delay.connect(this.gain); this.gain.connect(ctx.destination);
+      this.src.connect(this.delay); this.gain.connect(ctx.destination); this._chain(); // delay -> muted pitches -> gate
       this.sink = ctx.createGain(); this.sink.gain.value = 0; this.sink.connect(ctx.destination);
       let ok = false;
       if (!BAD_WORKLET && ctx.audioWorklet && typeof AudioWorkletNode !== 'undefined') {
@@ -108,6 +108,15 @@ registerProcessor('samt-tap', SamtTap);
       });
     }
     setDelay(sec) { this.delaySec = sec; if (this.delay) this.delay.delayTime.setTargetAtTime(sec, this.ctx.currentTime, 0.02); }
+    /* Muted sounds: one notch per pitch ([{f, q}]) between the delay and the gate, so they never reach the echo. */
+    setNotches(tones) { this.tones = (tones || []).slice(); if (this.delay && this.gain) this._chain(); }
+    _chain() {
+      try { this.delay.disconnect(); } catch (e) {}
+      for (const n of this.notches) { try { n.disconnect(); } catch (e) {} }
+      this.notches = this.tones.map(t => { const b = this.ctx.createBiquadFilter(); b.type = 'notch'; b.frequency.value = t.f; b.Q.value = t.q; return b; });
+      let node = this.delay; for (const b of this.notches) { node.connect(b); node = b; }
+      node.connect(this.gain);
+    }
     setVolume(v) { this.vol = Math.min(1, v); if (this.open) this.setEcho(true); }
     _release() {
       try { if (this.stream) this.stream.getTracks().forEach(t => { t.onended = t.onmute = t.onunmute = null; t.stop(); }); } catch (e) {}
@@ -119,10 +128,10 @@ registerProcessor('samt-tap', SamtTap);
       try { if (this.gain) this.gain.gain.value = 0; } catch (e) {}
       try { navigator.mediaDevices.removeEventListener('devicechange', this._dev); } catch (e) {}
       this._release();
-      for (const n of [this.src, this.tap, this.sp, this.delay, this.gain, this.sink]) { try { if (n) n.disconnect(); } catch (e) {} }
+      for (const n of [this.src, this.tap, this.sp, this.delay, this.gain, this.sink, ...this.notches]) { try { if (n) n.disconnect(); } catch (e) {} }
       if (this.tap) this.tap.port.onmessage = null;
       if (this.sp) this.sp.onaudioprocess = null;
-      this.src = this.tap = this.sp = this.delay = this.gain = this.sink = null;
+      this.src = this.tap = this.sp = this.delay = this.gain = this.sink = null; this.notches = [];
       try { if (this.ctx && this.ctx.state === 'running') this.ctx.suspend(); } catch (e) {}
     }
   }
@@ -152,6 +161,7 @@ registerProcessor('samt-tap', SamtTap);
     setEcho(open) { this.open = open; this.echoLog.push([+this.t.toFixed(2), open]); }
     chime() { this.echoLog.push([+this.t.toFixed(2), 'chime']); }
     setDelay() {} setVolume() {}
+    setNotches(tones) { this.tones = (tones || []).slice(); }
     stop() { /* the test keeps one fake mic for the whole run */ }
   }
 

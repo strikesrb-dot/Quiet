@@ -85,7 +85,7 @@ let fails = 0; const ok = (c, s) => { console.log(`[${engine} ${mode}] ${c ? 'PA
     // Details
     await page.click('#detailsBtn'); await page.waitForSelector('#detailsPanel.show'); await sleep(300);
     const tl = await page.textContent('#tlMe'); ok(/%/.test(tl), 'Details, you vs others: ' + tl + ' / ' + await page.textContent('#tlOth'));
-    out('Details: talk ' + await page.textContent('#cTalkTime') + ', turns ' + await page.textContent('#cTalk') + ', talked freely ' + await page.textContent('#cPass') + ', others ' + await page.textContent('#cOther') + ', cut in ' + await page.textContent('#cInt'));
+    out('Details: talk ' + await page.textContent('#cTalkTime') + ', turns ' + await page.textContent('#cTalk') + ', short replies ' + await page.textContent('#cShort') + ', others ' + await page.textContent('#cOther') + ', cut in ' + await page.textContent('#cInt') + ', muted sounds ' + await page.textContent('#muteStatus2'));
     await shot('details_1024');
     await page.click('#detailsClose'); await page.waitForSelector('#detailsPanel', { state: 'hidden' });
     out('verdicts before any interruption: ' + await page.evaluate(() => { const ev = SamtDebug.events; const i = ev.findIndex(e => e.type === 'interrupt'); if (i < 0) return 'none'; let from = 0; for (let k = i - 1; k >= 0; k--) if (ev[k].type === 'segment') { from = k + 1; break; } return ev.slice(from, i + 1).filter(e => e.type === 'verdict' || e.type === 'interrupt').map(e => e.type === 'verdict' ? (e.isMe ? 'me' : 'oth') + '(' + e.margin.toFixed(1) + ')@' + e.t : 'INT@' + e.t).join(' '); }));
@@ -109,7 +109,7 @@ let fails = 0; const ok = (c, s) => { console.log(`[${engine} ${mode}] ${c ? 'PA
     await page.click('#askClaude');
     await page.waitForSelector('#endSummary:not([hidden])', { timeout: 10000 });
     ok((await page.textContent('#endSummaryText')).includes('quiet'), 'Claude summary shows');
-    ok(sent && sent.session && sent.session.mood === 'okay' && sent.session.note.startsWith('Hard') && Array.isArray(sent.last7Days) && sent.last7Days.length === 7 && !('samples' in sent) && JSON.stringify(sent).length < 3000,
+    ok(sent && sent.session && sent.session.mood === 'okay' && sent.session.note.startsWith('Hard') && sent.session.echoBy === 'voice' && !('phrasesPassed' in sent.session) && Array.isArray(sent.last7Days) && sent.last7Days.length === 7 && !('samples' in sent) && JSON.stringify(sent).length < 3000,
       'request body: ' + JSON.stringify(sent).slice(0, 300));
     await page.click('#endDone'); await page.waitForSelector('#endPanel', { state: 'hidden' });
     ok((await view()) === 'home' && await page.isVisible('#toProgress'), 'back on Home, Progress row: ' + await page.textContent('#progressStatus'));
@@ -170,7 +170,7 @@ let fails = 0; const ok = (c, s) => { console.log(`[${engine} ${mode}] ${c ? 'PA
     // backup has the new parts (Settings → Backup and erase)
     await visit('settings'); await page.click('#toData'); await page.waitForSelector('#dataPanel.show');
     const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 10000 }).catch(() => null), page.click('#backupBtn')]);
-    if (dl) { const p = path.join(OUT, `backup3_${engine}_${mode}.json`); await dl.saveAs(p); const d = JSON.parse(fs.readFileSync(p)); ok(d.version === 3 && d.history.length === h0 + 1 && d.shared.budget === 25, 'backup has history and shared settings'); }
+    if (dl) { const p = path.join(OUT, `backup4_${engine}_${mode}.json`); await dl.saveAs(p); const d = JSON.parse(fs.readFileSync(p)); ok(d.version === 4 && d.history.length === h0 + 1 && d.shared.budget === 25 && Array.isArray(d.shared.mutes) && 'line' in d.shared, 'backup v4: history, shared settings with the line and muted sounds'); }
     else ok(false, 'backup download');
     await page.click('#dataDone'); await page.waitForSelector('#dataPanel', { state: 'hidden' });
     // layout: every page at a phone and a tablet, day and night

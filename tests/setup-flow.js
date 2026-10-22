@@ -3,8 +3,9 @@
 // tests/features.js restores to tests/out/.
 // End-to-end run of the built page in a real browser engine (chromium | webkit) with the fake mic, through the four
 // states: setup step by step (the reading with a pause mid-reading, the echo test, other voices, the check and its
-// advice, the phrases, the summary), the setup and the phrases again from Settings, a test session, a real session
-// (Details, a correction, hold to stop), the end sheet, backup and restore, erase, layout at five widths.
+// advice, the summary), the setup again from Settings, a test session, a real session (Details, a correction, hold to
+// stop), the end sheet, backup and restore, erase, layout at five widths. All with Your voice; tests/sound-level.js
+// covers Sound level.
 const pw = (() => { try { return require('playwright-core'); } catch (e) { return require('/opt/node-tools/node_modules/playwright-core'); } })(); const { spawn } = require('child_process'); const fs = require('fs'), path = require('path');
 const [engine = 'webkit', mode = 'light', speed = '25'] = process.argv.slice(2);
 const ROOT = path.resolve(__dirname, '..'), OUT = path.join(__dirname, 'out'), sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -32,10 +33,10 @@ const PORT = 8770 + Math.floor(Math.random() * 100);
     if (mode === 'neural') { await page.waitForFunction(() => document.querySelector('#modelStatus').textContent.startsWith('Ready'), null, { timeout: 180000 }); out('model: ' + await page.textContent('#modelStatus')); }
     await page.waitForFunction(() => window.SamtDebug && SamtDebug.feed, null, { timeout: 20000 });
     const feed = n => page.evaluate(x => SamtDebug.feed(x, '/tests/audio/' + x + '.f32'), n);
-    const idle = () => page.waitForFunction(() => !document.querySelector('#recordAll').disabled, null, { timeout: 300000 });
+    const idle = () => page.waitForFunction(() => !document.querySelector('#resetAll').disabled, null, { timeout: 300000 }); // enabled only when nothing is running
     out(`first open: setup card ${await page.isVisible('#setupCard')} ("${await page.textContent('#setupTitle')}"), Start shown ${await page.isVisible('#go')}, quick tools ${await page.isVisible('#openCards')}`);
     // 1. setup, step by step, from the first open's card: the reading (with a pause part-way), the echo test, other
-    //    voices, the check (two rounds, then the advice) and the phrases, then the summary
+    //    voices and the check (two rounds, then the advice), then the summary
     const step = async () => `${await page.textContent('#wzCount')}: ${await page.textContent('#wzStepTitle')}`;
     const wzIdle = () => page.waitForFunction(() => !document.querySelector('#wzMain').disabled && document.querySelector('#recPanel').hidden, null, { timeout: 300000 });
     const goNext = async () => { if (await page.isVisible('#wzMain') && (await page.textContent('#wzMain')) === 'Next') await page.click('#wzMain'); else await page.click('#wzNext'); await sleep(250); };
@@ -95,26 +96,19 @@ const PORT = 8770 + Math.floor(Math.random() * 100);
       out('  stretches: ' + await checkLog());
     }
     await page.evaluate(v => { SamtDebug.engine.speed = v; }, +speed);
-    await goNext(); out(await step());
-    t0 = Date.now(); await page.click('#wzMain'); await sleep(300);
-    for (const id of ['hi', 'hello', 'how_are_you', 'im_good', 'salam', 'salam_reply', 'thank_you', 'jazak', 'welcome', 'yes', 'no', 'okay']) await feed('phr_' + id);
-    await idle(); await page.waitForSelector('#recPanel', { state: 'hidden' });
-    out(`step 5 in ${Date.now() - t0} ms: ${await page.textContent('#wzStatus')}`);
     await goNext();
     out(`summary: ${await page.textContent('#wzSumTitle')} | ${(await page.$$eval('#wzSumList .row', rs => rs.map(r => r.querySelector('.rt').textContent + ': ' + r.querySelector('.rv').textContent))).join(' · ')}`);
     await page.click('#wzFinish'); await sleep(300);
     out(`Finish goes to: ${await view()} | ready card ${await page.isVisible('#readyCard')}, setup card ${await page.isVisible('#setupCard')}`);
-    // 2. the same places from Settings: the setup again (it opens on the summary), and the phrases page
+    // 2. the setup again from Settings (it opens on the summary)
     await page.click('#toSettings'); await sleep(200);
-    out(`Settings: step-by-step setup "${await page.textContent('#wizStatus')}" | voice ${await page.textContent('#voiceStatus')} | others ${await page.textContent('#othStatus')}`);
+    out(`Settings: step-by-step setup "${await page.textContent('#wizStatus')}" | voice ${await page.textContent('#voiceStatus')} | others ${await page.textContent('#othStatus')} | muted sounds ${await page.textContent('#muteStatus')} | phrases row gone ${!(await page.$('#toPhrases'))}`);
     await page.click('#toWizard'); await sleep(300); out(`setup from Settings opens on: ${await page.textContent('#wzSumTitle')} (Back says "${await page.textContent('#wzBack')}")`);
-    await back(); out('Back from the setup goes to: ' + await view());
-    await page.click('#toPhrases'); await sleep(200); out('phrases: ' + await page.textContent('#phrStatus'));
-    await back(); out('Back from Phrases goes to: ' + await view()); await back(); out('then to: ' + await view());
+    await back(); out('Back from the setup goes to: ' + await view()); await back(); out('then to: ' + await view());
     await reopen();
     if (mode === 'neural') await page.waitForFunction(() => document.querySelector('#modelStatus').textContent.startsWith('Ready'), null, { timeout: 180000 });
     await page.waitForFunction(() => window.SamtDebug && SamtDebug.feed && document.querySelector('#voiceStatus').textContent !== 'Not taught', null, { timeout: 20000 });
-    out(`after reload: voice ${await page.textContent('#voiceStatus')} | others ${await page.textContent('#othStatus')} | ${await page.textContent('#phrStatus')} | Home ready ${await page.isVisible('#readyCard')}`);
+    out(`after reload: voice ${await page.textContent('#voiceStatus')} | others ${await page.textContent('#othStatus')} | Home ready ${await page.isVisible('#readyCard')}`);
     // 3. a test session (a tap stops it)
     const TEST = process.env.TEST || 'test';
     if (process.env.TSPEED) await page.evaluate(v => { SamtDebug.engine.speed = v; }, +process.env.TSPEED);
@@ -127,7 +121,7 @@ const PORT = 8770 + Math.floor(Math.random() * 100);
     const pct = (a, f) => a.length ? Math.round(100 * a.filter(f).length / a.length) + '%' : '-';
     const me = res.filter(r => r.role === 'me'), oth = res.filter(r => r.role !== 'me'), talk = me.filter(r => r.kind === 'test_talk'), ph = me.filter(r => r.kind === 'test_phrase');
     const lats = talk.filter(r => r.lat != null).map(r => r.lat).sort((a, b) => a - b);
-    out(`test pass ${Date.now() - t0} ms: your talk echoed ${pct(talk, r => r.echo)} (median ${lats.length ? lats[lats.length >> 1].toFixed(2) : '-'} s) | phrases passed ${pct(ph, r => !r.echo)} (recognised ${pct(ph, r => r.passes.length)}) | others ignored ${pct(oth, r => !r.echo)} | back on ${await view()}`);
+    out(`test pass ${Date.now() - t0} ms: your talk echoed ${pct(talk, r => r.echo)} (median ${lats.length ? lats[lats.length >> 1].toFixed(2) : '-'} s) | your short phrases let through ${pct(ph, r => !r.echo)} (no phrase list now) | others ignored ${pct(oth, r => !r.echo)} | back on ${await view()}`);
     // 4. a real session: Details, a correction, a tap that doesn't stop it, a hold that does
     await page.click('#go'); await sleep(300); await feed('enroll2_me'); await sleep(600);
     out('silence mode echo toggles: ' + (await page.evaluate(() => SamtDebug.engine.echoLog.length)));

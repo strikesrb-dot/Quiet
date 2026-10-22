@@ -294,8 +294,8 @@ body.in-session { --q-page: color-mix(in srgb, var(--q-acc) 9%, #f9f9f7); }
 html.ql body.theme-dark.in-session { --q-page: color-mix(in srgb, var(--q-acc) 12%, #20201f); }
 body:not([data-view="home"]) #appHead { display: none; } /* a page shows its own Back and title; a session shows only itself */
 body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a session's tint) fills the screen when the content is short */
-.session { gap: 16px; }
-.s-top { display: flex; justify-content: space-between; align-items: center; gap: var(--q-sp); min-height: var(--tap); }
+.session { gap: var(--q-sp); }
+.s-top { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; column-gap: 16px; row-gap: 4px; margin-top: -4px; }
 .s-kind { display: inline-flex; align-items: center; gap: 8px; color: var(--q-acc); font: 800 var(--q-t-min)/1 var(--q-ui); letter-spacing: .06em; text-transform: uppercase; }
 .s-kind::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--q-acc); }
 .session .quietl { margin: 0; font-size: var(--q-t-body); }
@@ -316,7 +316,7 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
 .ic.up { width: 16px; height: 16px; transform: rotate(-90deg); }
 
 /* setup, step by step: a five-part bar for where you are (done in clay, this step in ink), one step's card at a time */
-.wz-bar { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-top: -8px; }
+.wz-bar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: -8px; }
 .wz-bar > i { height: 6px; border-radius: var(--q-r-cap); background: var(--q-fill); transition: background-color 300ms var(--q-ease); }
 .wz-bar > i[data-s="done"] { background: var(--q-acc); }
 .wz-bar > i[data-s="skipped"] { background: var(--q-acc-soft); }
@@ -328,6 +328,17 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
 .wz-sumt { padding: 0 var(--q-row-px); }
 .wz-nav { display: flex; align-items: center; min-height: var(--tap); margin-top: -12px; }
 .wz-nav #wzNext { margin-inline-start: auto; }
+
+/* Sound level: − / + beside the live pill move the line on the level bar; the bar turns dark while it's over the line */
+.s-live { display: grid; grid-template-columns: var(--tap) minmax(0, 1fr) var(--tap); align-items: center; gap: var(--q-sp); }
+.s-live .live { grid-column: 2; justify-self: center; }
+.s-live #lineUp { grid-column: 3; }
+.lvwrap { position: relative; min-width: 0; }
+.linemark { position: absolute; top: -8px; bottom: -8px; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--q-ink); pointer-events: none; }
+body.lv-mode .lvwrap .meter { height: 10px; }
+.meter > i { transition: background-color 120ms linear; }
+.meter.over > i { background: var(--q-strong); }
+#muteScrim { z-index: 42; } #mutePanel { z-index: 43; } /* above a session's Details sheet, which opens it; under the action sheet that confirms Unmute */
 
 @media (prefers-reduced-motion: reduce) {
   .showv, .show-body, .tlbar > i, .sw, .sw::after { transition: opacity 150ms linear !important; } /* overrides the springs: Reduce Motion is a 150 ms fade */
@@ -356,6 +367,8 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
   <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-turn" viewBox="0 0 24 24"><path d="M4.5 10.5a8 8 0 0 1 14-3.5l1.5 1.5"/><path d="M20 4v4.5h-4.5"/><path d="M19.5 13.5a8 8 0 0 1-14 3.5L4 15.5"/><path d="M4 20v-4.5h4.5"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M6 12h12M12 6v12"/></symbol>
   <symbol id="i-steps" viewBox="0 0 24 24"><path d="M3.5 6.5l1.7 1.7 3-3.2M3.5 12.5l1.7 1.7 3-3.2"/><circle cx="5.5" cy="18.5" r="1.7"/><path d="M11.5 7h9M11.5 13h9M11.5 18.5h9"/></symbol>
 </svg>
 <main class="win">
@@ -369,7 +382,7 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
   <section id="vHome" class="view" aria-label="Home">
     <section id="setupCard" class="card glass" aria-labelledby="setupTitle" hidden>
       <h2 class="ctitle" id="setupTitle">Set up Samt</h2>
-      <p class="cbody">Five short steps, about 5 minutes: your voice, the echo, other voices, a check that Samt can tell you apart, and phrases. Wear the headphones you'll use.</p>
+      <p class="cbody">Four short steps, about 4 minutes: your voice, the echo, other voices, and a check that Samt can tell you apart. Wear the headphones you'll use.</p>
       <p class="cstatus" id="setupModel" hidden></p>
       <button id="setupStart" class="btn strong" type="button">Start setup</button>
       <p class="cnote">Sessions open once Samt knows your voice. Cards, the sign and reminders work now.</p>
@@ -380,6 +393,7 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
       <p class="cnote center" id="lenHint">Tap the time to change it</p>
       <div class="seg" id="kindSeg" role="radiogroup" aria-label="Kind of session"></div>
       <button id="convLine" class="btn plain small" type="button" hidden></button>
+      <div class="seg" id="whoSeg" role="radiogroup" aria-label="What turns the echo on"></div>
       <button id="go" class="btn strong" type="button">Start silence</button>
       <button id="test" class="btn glass" type="button">Test without echo</button>
       <p class="today" id="todayLine"></p>
@@ -399,10 +413,16 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
 
   <!-- SESSION: only what a running session needs; the rest of the app waits until it ends -->
   <section id="vSession" class="view session" aria-label="Session" hidden>
-    <div class="s-top"><span id="sKind" class="s-kind">Silence</span><span id="quietLine" class="quietl">Quiet for <b id="quietFor">0:00</b></span></div>
+    <div class="seg" id="sWhoSeg" role="radiogroup" aria-label="What turns the echo on"></div>
     <div id="sReadout" class="hero" role="timer" aria-label="Time left">30:00</div>
-    <div id="live" class="live" data-state="off" aria-live="polite"><span class="dot"></span><span id="liveText">Listening</span></div>
-    <div class="meter" aria-hidden="true"><i id="level"></i></div>
+    <div class="s-top"><span id="sKind" class="s-kind">Silence</span><span id="quietLine" class="quietl">Quiet for <b id="quietFor">0:00</b></span></div>
+    <!-- the live pill; with Sound level, − / + beside it move the line on the level bar (the bar turns dark over the line) -->
+    <div class="s-live">
+      <button id="lineDown" class="round" type="button" aria-label="Lower the line" hidden><svg class="ic" aria-hidden="true"><use href="#i-minus"/></svg></button>
+      <div id="live" class="live" data-state="off" aria-live="polite"><span class="dot"></span><span id="liveText">Listening</span></div>
+      <button id="lineUp" class="round" type="button" aria-label="Raise the line" hidden><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></button>
+    </div>
+    <div class="lvwrap"><div class="meter" aria-hidden="true"><i id="level"></i></div><span id="lineMark" class="linemark" aria-hidden="true" hidden></span><span id="lineSr" class="sr" aria-live="polite"></span></div>
     <div id="remind" class="remind" hidden></div>
     <button id="resume" class="btn strong" type="button" hidden>Resume</button>
     <button id="pass" class="btn glass" type="button">Talk freely, 10 s</button>
@@ -425,7 +445,7 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
         <div class="row"><span class="rt" id="budgetLabel">Daily talk budget</span><div class="stp" role="group" aria-labelledby="budgetLabel"><button id="budgetDown" type="button" aria-label="Smaller budget">−</button><output id="budgetOut">20 min</output><button id="budgetUp" type="button" aria-label="Bigger budget">+</button></div></div>
         <div class="row"><span class="rt">Days within budget</span><span class="rv" id="streak">0</span></div>
       </div>
-      <p class="foot">Talk time is your talking, not counting the phrases that pass.</p>
+      <p class="foot">Talk time is the talking Samt counted as yours. With Sound level, that's all talk over the line.</p>
     </section>
     <section class="sec" aria-label="The last 7 days">
       <div class="group week">
@@ -453,7 +473,6 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
         <button class="row gl" id="toWizard" type="button"><svg class="ic"><use href="#i-steps"/></svg><span class="rt">Step-by-step setup</span><span class="rv" id="wizStatus"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
         <button class="row gl" id="teachVoice" type="button"><svg class="ic"><use href="#i-mic"/></svg><span class="rt">Your voice</span><span class="rv" id="voiceStatus">Not taught</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
         <button class="row gl" id="teachOthers" type="button"><svg class="ic"><use href="#i-people"/></svg><span class="rt">Other voices</span><span class="rv" id="othStatus">Recommended</span><svg class="ic chev"><use href="#i-chev"/></svg></button>
-        <button class="row gl" id="toPhrases" type="button"><svg class="ic"><use href="#i-hush"/></svg><span class="rt">Phrases that pass</span><span class="rv" id="phrCount"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
       </div>
     </section>
     <section class="sec" aria-labelledby="capSess">
@@ -462,6 +481,7 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
         <button class="row" id="toConv" type="button"><span class="rt">Conversation</span><span class="rv" id="convStatus"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
         <button class="row" id="toEcho" type="button"><span class="rt">Echo</span><span class="rv" id="echoStatus"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
         <button class="row" id="toMatch" type="button"><span class="rt">Matching</span><span class="rv" id="matchStatus"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+        <button class="row" id="toMute" type="button"><span class="rt">Muted sounds</span><span class="rv" id="muteStatus"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
       </div>
     </section>
     <section class="sec" aria-labelledby="capLook">
@@ -477,25 +497,13 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
     </section>
   </section>
 
-  <!-- PHRASES (under Settings) -->
-  <section id="vPhrases" class="view" aria-labelledby="phTitle" hidden>
-    <div class="pagehead"><button class="back" type="button" data-back><svg class="ic" aria-hidden="true"><use href="#i-back"/></svg>Settings</button></div>
-    <h2 class="ptitle" id="phTitle">Phrases that pass</h2>
-    <div id="phraseList" class="sec"></div>
-    <div class="group">
-      <button class="row act" id="recordAll" type="button">Record the missing phrases</button>
-      <form id="addPhrase" class="row"><input id="newPhrase" class="field grow" type="text" maxlength="60" placeholder="Add your own phrase" aria-label="New phrase"><button class="btn plain" type="submit">Add</button></form>
-    </div>
-    <p class="foot">Say each phrase 3 times. When Samt hears one of them from you, it lets it through with no echo. Replies shorter than half a second already pass. <span id="phrStatus"></span></p>
-  </section>
-
   <!-- SETUP, STEP BY STEP (first open, and again from Settings): one step at a time, each step's result in its card -->
   <section id="vWizard" class="view" aria-labelledby="wzTitle" hidden>
     <div class="pagehead"><button class="back" type="button" data-back><svg class="ic" aria-hidden="true"><use href="#i-back"/></svg><span id="wzBack">Samt</span></button></div>
     <h2 class="ptitle" id="wzTitle">Set up Samt</h2>
-    <div class="wz-bar" id="wzBar" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="wz-bar" id="wzBar" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
     <section id="wzCard" class="card glass" aria-labelledby="wzStepTitle" aria-live="polite">
-      <p class="wz-count" id="wzCount">Step 1 of 5</p>
+      <p class="wz-count" id="wzCount">Step 1 of 4</p>
       <h3 class="ctitle" id="wzStepTitle">Your voice</h3>
       <p class="cbody" id="wzBody"></p>
       <div class="wz-res" id="wzRes" hidden>
@@ -525,7 +533,6 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
   <div class="actions">
     <button id="recResume" class="btn strong" type="button" hidden>Resume</button>
     <button id="recDone" class="btn strong" type="button">Done</button>
-    <button id="recSkip" class="btn glass" type="button" hidden>Skip</button>
   </div>
 </div>
 
@@ -605,7 +612,7 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
     <button class="row" id="swInterrupt" type="button" role="switch" aria-checked="true"><span class="rt">No interrupting</span><span class="sw" aria-hidden="true"></span></button>
     <button class="row" id="swNudge" type="button" role="switch" aria-checked="true"><span class="rt">Nudge before the echo</span><span class="sw" aria-hidden="true"></span></button>
   </div>
-  <p class="hint">Each turn you can talk this long before the echo starts. A new turn begins when someone else speaks, or when you stay quiet for a second and a half. No interrupting: talking over someone starts the echo at once. Nudge: a soft two-note tone in your headphones about 2½ seconds before the echo.</p>
+  <p class="hint">Each turn you can talk this long before the echo starts. A new turn begins when someone else speaks, or when you stay quiet for a second and a half. No interrupting: talking over someone starts the echo at once (Your voice only: Sound level can't tell who is talking). Nudge: a soft two-note tone in your headphones about 2½ seconds before the echo.</p>
   <div class="actions"><button id="convDone" class="btn strong" type="button">Done</button></div>
 </div>
 
@@ -616,18 +623,20 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
     <div class="row col"><div class="tl-top"><span>You <b id="tlMe">0%</b></span><span>Others <b id="tlOth">0%</b></span></div><div class="tlbar" aria-hidden="true"><i id="tlBar"></i></div></div>
     <div class="row"><span class="rt">Talk time</span><span class="rv" id="cTalkTime">0:00</span></div>
     <div class="row"><span class="rt">Times echoed</span><span class="rv" id="cTalk">0</span></div>
-    <div class="row"><span class="rt">Phrases passed</span><span class="rv" id="cPass">0</span></div>
-    <div class="row"><span class="rt">Short replies</span><span class="rv" id="cShort">0</span></div>
+    <div class="row" id="shortRow"><span class="rt">Short replies</span><span class="rv" id="cShort">0</span></div>
     <div class="row"><span class="rt">Others ignored</span><span class="rv" id="cOther">0</span></div>
-    <div class="row"><span class="rt">Talked over someone</span><span class="rv" id="cInt">0</span></div>
+    <div class="row" id="intRow"><span class="rt">Talked over someone</span><span class="rv" id="cInt">0</span></div>
     <div class="row" id="nudgeRow" hidden><span class="rt">Nudges</span><span class="rv" id="cNudge">0</span></div>
   </div>
   <div id="last" class="group" hidden>
     <div class="row"><span class="rt">Last</span><span class="rv wrap" id="lastText"></span></div>
     <div class="row btns"><button id="wasMe" class="btn plain" type="button">That was me</button><button id="notMe" class="btn plain" type="button">Not me</button></div>
   </div>
-  <div class="group"><div class="row"><span class="rt" id="dVolLabel">Echo volume</span><div class="stp" role="group" aria-labelledby="dVolLabel"><button id="dVolDown" type="button" aria-label="Quieter">−</button><output id="dVolOut"></output><button id="dVolUp" type="button" aria-label="Louder">+</button></div></div></div>
-  <p class="hint">You and Others: how much of the talking Samt heard was you.</p>
+  <div class="group">
+    <div class="row"><span class="rt" id="dVolLabel">Echo volume</span><div class="stp" role="group" aria-labelledby="dVolLabel"><button id="dVolDown" type="button" aria-label="Quieter">−</button><output id="dVolOut"></output><button id="dVolUp" type="button" aria-label="Louder">+</button></div></div>
+    <button class="row" id="dMute" type="button"><span class="rt">Muted sounds</span><span class="rv" id="muteStatus2"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
+  </div>
+  <p class="hint" id="tlHint">You and Others: how much of the talking Samt heard was you.</p>
 </div>
 
 <div id="testScrim" class="scrim" hidden></div>
@@ -660,10 +669,21 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
   <div class="sheet-head"><h2 id="matchTitle">Matching</h2><button id="matchClose" class="round" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
   <h3 class="cap" id="capVoice">Your voice</h3>
   <div class="group"><div class="row full"><div class="seg" id="strictSeg" role="radiogroup" aria-labelledby="capVoice"></div></div></div>
-  <h3 class="cap" id="capPhrM">Phrases</h3>
-  <div class="group"><div class="row full"><div class="seg" id="psensSeg" role="radiogroup" aria-labelledby="capPhrM"></div></div></div>
-  <p class="hint">Looser catches more of your talking and passes phrases more easily. Stricter ignores other people more.</p>
+  <p class="hint">Looser catches more of your talking. Stricter ignores other people more. This is for Your voice; Sound level uses its line instead.</p>
   <div class="actions"><button id="matchDone" class="btn strong" type="button">Done</button></div>
+</div>
+
+<!-- Muted sounds: from Settings, and from a session's Details (so it sits above that sheet) -->
+<div id="muteScrim" class="scrim" hidden></div>
+<div id="mutePanel" class="sheet paged" role="dialog" aria-modal="true" aria-labelledby="muteTitle" hidden>
+  <div class="sheet-head"><h2 id="muteTitle">Muted sounds</h2><button id="muteClose" class="round" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
+  <div class="group" id="muteList" hidden></div>
+  <p class="hint" id="muteNone">None yet.</p>
+  <p class="cstatus" id="muteResult" aria-live="polite"></p>
+  <div class="meter" hidden><i id="muteProg"></i></div>
+  <div class="actions"><button id="muteGo" class="btn strong" type="button">Mute a sound</button></div>
+  <p class="hint" id="muteFull" hidden>That's the most Samt keeps. Unmute one to add another.</p>
+  <p class="hint">While the sound is going and you stay quiet, tap Mute a sound. Samt listens for 3 seconds, finds the sound's strongest pitches and cuts them from the echo and from what the line measures. It works for steady hums and whines, like a generator, a fan or an engine's whine. A roar spread over every pitch, like wind, can't be cut without cutting your voice too; raise the line above it instead.</p>
 </div>
 
 <div id="dataScrim" class="scrim" hidden></div>
@@ -975,7 +995,52 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
     }
   }
 
-  S.dsp = { makeResamplerClass, Resampler, FFT, LogMel, fbank, melBanks, makeWindow, FeatureStream, VAD, yin };
+  /* One pitch cut out (RBJ cookbook notch, the same formula as Web Audio's BiquadFilterNode 'notch', so the echo's
+     filters and the level's filters match). Q = f0 / width. Returns a per-sample function with its own state. */
+  function notch(f0, q, fs) {
+    const w = TAU * f0 / fs, al = Math.sin(w) / (2 * q), c = Math.cos(w), a0 = 1 + al;
+    const b0 = 1 / a0, b1 = -2 * c / a0, a2 = (1 - al) / a0;
+    let z1 = 0, z2 = 0;
+    return x => { const y = b0 * x + z1; z1 = b1 * x - b1 * y + z2; z2 = b0 * x - a2 * y; return y; };
+  }
+  /* x through a list of notches ([{f, q}]), as a new array. */
+  function applyNotches(x, tones, fs = 16000) {
+    const F = (tones || []).map(t => notch(t.f, t.q, fs)), y = new Float32Array(x.length);
+    for (let i = 0; i < x.length; i++) { let v = x[i]; for (let j = 0; j < F.length; j++) v = F[j](v); y[i] = v; }
+    return y;
+  }
+  /* Mean power of x in dB (like a frame's energy), skipping the first `skip` samples (filters settling). */
+  function levelDb(x, skip = 0) { let e = 0; for (let i = skip; i < x.length; i++) e += x[i] * x[i]; return 10 * Math.log10(e / Math.max(1, x.length - skip) + 1e-12); }
+  /* The steady pitches of a sound, like a machine's hum or whine: the strongest narrow peaks of its averaged spectrum,
+     at least `prom` dB over their surroundings, 50 Hz to 7 kHz. Returns up to `max` of [{f, q}], strongest first; the
+     width of each (where the peak is 10 dB down) sets its notch's Q, kept between 4 and 30. A sound spread over every
+     pitch (wind, a roar) has no such peaks and returns []. */
+  function findTones(x, { fs = 16000, n = 4096, max = 6, prom = 10 } = {}) {
+    const fft = new FFT(n), win = makeWindow('hann', n), buf = new Float32Array(n), half = n / 2, P = new Float64Array(half + 1), tmp = new Float64Array(half + 1);
+    let frames = 0;
+    for (let s = 0; s + n <= x.length; s += half) {
+      for (let i = 0; i < n; i++) buf[i] = x[s + i] * win[i];
+      fft.power(buf, n, tmp); for (let k = 0; k <= half; k++) P[k] += tmp[k]; frames++;
+    }
+    if (!frames) return [];
+    const res = fs / n, D = Array.from(P, p => 10 * Math.log10(p / frames + 1e-20));
+    const lo = Math.max(2, Math.ceil(50 / res)), hi = Math.min(half - 3, Math.floor(7000 / res)), found = [];
+    for (let k = lo; k <= hi; k++) {
+      if (!(D[k] > D[k - 1] && D[k] >= D[k + 1] && D[k] >= D[k - 2] && D[k] >= D[k + 2])) continue;
+      const w = Math.max(12, Math.round(k * 0.08)), around = D.slice(Math.max(0, k - w), Math.min(D.length, k + w + 1)).sort((a, b) => a - b);
+      if (D[k] - around[around.length >> 1] < prom) continue;
+      const den = D[k - 1] - 2 * D[k] + D[k + 1], d = den < 0 ? 0.5 * (D[k - 1] - D[k + 1]) / den : 0; // the centre, between bins
+      let a = k, b = k; while (a > lo && D[a - 1] > D[k] - 10) a--; while (b < hi && D[b + 1] > D[k] - 10) b++;
+      const f = (k + d) * res, width = Math.max(12, (b - a + 1) * res);
+      found.push({ f, q: Math.max(4, Math.min(30, f / width)), db: D[k] });
+    }
+    found.sort((p, q) => q.db - p.db);
+    const pick = [];
+    for (const c of found) { if (pick.length >= max) break; if (pick.every(p => Math.abs(p.f - c.f) > Math.max(20, 0.05 * c.f))) pick.push(c); }
+    return pick.map(({ f, q }) => ({ f: Math.round(f * 10) / 10, q: Math.round(q * 10) / 10 }));
+  }
+
+  S.dsp = { makeResamplerClass, Resampler, FFT, LogMel, fbank, melBanks, makeWindow, FeatureStream, VAD, yin, notch, applyNotches, levelDb, findTones };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
 
 /* Samt models: statistics helpers, diagonal GMM, logistic regression, DTW phrase spotter. */
@@ -1262,14 +1327,17 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
   S.LightVoice = LightVoice;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
 
-/* Samt pipeline: Listener (features + speech detection), PhraseBook (allowed phrases),
-   Teacher (setup recordings) and Controller (live echo decisions). */
+/* Samt pipeline: Listener (features + speech detection), PhraseBook (allowed phrases; no longer offered in the app,
+   so the Controller runs without one), Teacher (setup recordings), Controller (live echo decisions by voice) and
+   LevelGate (live echo decisions by sound level). */
 (function (G) {
   'use strict';
   const S = G.Samt || (G.Samt = {});
   const { FeatureStream, VAD } = S.dsp;
   const { st, Spotter } = S.models;
   const D = 26;
+  /* A session's numbers. Both deciders add to the same object, so switching mid-session keeps them. */
+  const newCounts = () => ({ talk: 0, talkSec: 0, pass: 0, short: 0, other: 0, interrupt: 0, nudge: 0, freePass: 0, meSec: 0, otherSec: 0, talkTime: 0 });
 
   class Listener {
     constructor() { this.consumer = null; this.tmp = new Float32Array(D); this.reset(); }
@@ -1411,19 +1479,27 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
       this.p = Object.assign({ minTalk: 50, contGap: 120, recheckWin: voice.kind === 'neural' ? 100 : 60, limit: 0, interrupt: false, nudge: false, nudgeGrace: 250, turnGap: 150 }, params || {});
       this.tmp = new Float32Array(D);
     }
-    start(mode) {
+    /* counts and lastMeEnd carry a session's numbers over when it switches between Your voice and Sound level. */
+    start(mode, counts, lastMeEnd) {
       this.mode = mode; this.seg = null; this.lastEnd = -1e9; this.lastEcho = false; this.segId = 0; this.history = [];
-      this.counts = { talk: 0, talkSec: 0, pass: 0, short: 0, other: 0, interrupt: 0, nudge: 0, freePass: 0, meSec: 0, otherSec: 0, talkTime: 0 };
-      this.turn = { talk: 0, lastMe: -1e9, otherAfter: false, nudged: false }; this.passUntil = -1; this.lastMeEnd = this.L.fs.nFrames; this.lastOtherEnd = -1e9;
+      this.counts = counts || newCounts();
+      this.turn = { talk: 0, lastMe: -1e9, otherAfter: false, nudged: false }; this.passUntil = -1; this.lastMeEnd = lastMeEnd != null ? lastMeEnd : this.L.fs.nFrames; this.lastOtherEnd = -1e9;
       this.spotter = new Spotter(this.book ? this.book.templates() : [], D);
       this.adaptQueue = []; this.L.consumer = this; this.on = true; this._state('listening');
     }
     stop() { if (this.seg && this.seg.echo) this._echo(false); this.on = false; this.seg = null; }
     /* The mic went away mid-speech: end the current segment now. */
     cut() { const seg = this.seg; if (!seg) return; seg.end = Math.max(seg.start, seg.next - 1); this._finish(); }
-    /* Talk freely for a while: no echo and no nudge until it runs out. */
-    pass(sec) {
-      this.passUntil = this.L.fs.nFrames + Math.round(sec * 100); this.counts.freePass++;
+    /* After the Listener restarts its frame count (a resume): its frame numbers start again from 0, so the ones kept here
+       start again too, keeping Talk freely's time left (`left`, read before the restart). */
+    resync(left) {
+      if (this.seg && this.seg.echo) this._echo(false);
+      const now = this.L.fs.nFrames; this.seg = null; this.lastEnd = -1e9; this.lastEcho = false; this.lastMeEnd = now; this.lastOtherEnd = -1e9;
+      this.passUntil = left > 0 ? now + Math.round(left * 100) : -1; this.turn = { talk: 0, lastMe: -1e9, otherAfter: false, nudged: false };
+    }
+    /* Talk freely for a while: no echo and no nudge until it runs out (quiet: carried over from a switch, not a tap). */
+    pass(sec, quiet) {
+      this.passUntil = this.L.fs.nFrames + Math.round(sec * 100); if (!quiet) this.counts.freePass++;
       if (this.seg && this.seg.echo) { this.seg.echo = false; this.counts.talk--; this.counts.talkSec += Math.max(0, this.L.fs.nFrames - this.seg.echoAt) / 100; this._echo(false); }
       this.lastEcho = false;
     }
@@ -1588,11 +1664,115 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
     }
   }
 
-  S.pipeline = { Listener, PhraseBook, Teacher, Controller, DEFAULT_PHRASES };
+  /* Sound level: no voice check. Any sound over the line opens the echo at once and holds it through short dips (the
+     hold outlasts the echo's delay, so a word's end is never cut); anything under the line is ignored. It measures the
+     raw 16 kHz audio itself (push), after the muted pitches are cut, in 10 ms frames, so it answers within a few frames.
+     It opens after 30 ms over the line, so a click doesn't; the level it holds on is the last 30 ms.
+     The Listener's speech detection (onVad) only marks stretches, for the counts and the check. Same surface as the
+     Controller, so the session, Details and the check use either one. */
+  class LevelGate {
+    constructor({ listener, onEcho, onEvent, onNudge, params }) {
+      this.L = listener; this.onEcho = onEcho || (() => {}); this.onEvent = onEvent || (() => {}); this.onNudge = onNudge || (() => {});
+      this.p = Object.assign({ line: -40, hold: 35, gap: 30, limit: 0, nudge: false, nudgeGrace: 250, turnGap: 150 }, params || {});
+      this.kind = 'level'; this.level = -90; this.filters = []; this.ring = new Uint8Array(1600); this.collect = null;
+    }
+    setNotches(tones) { this.filters = (tones || []).map(t => S.dsp.notch(t.f, t.q, 16000)); }
+    start(mode, counts, lastMeEnd) {
+      this.mode = mode; this.on = true; this.f = Math.floor(this.L.fs.sTotal / 160); this.acc = 0; this.bn = 0; this.pw = [0, 0, 0];
+      this.counts = counts || newCounts();
+      this.isOpen = false; this.over = false; this.run = 0; this.lastOver = -1e9; this.st = null; this.seg = null; this.segId = 0;
+      this.turn = { talk: 0, nudged: false }; this.otherAfter = false; this.passUntil = -1;
+      this.lastMeEnd = lastMeEnd != null ? lastMeEnd : this.f; this.adaptQueue = []; this.history = [];
+      this.ring.fill(0); this.L.consumer = this; this._state('listening');
+    }
+    stop() { if (this.isOpen) this._setOpen(false, this.f); this.on = false; this.seg = null; }
+    /* The mic went away, or the session ends: close the stretch still going. */
+    cut() { if (this.seg) this._endSeg(this.f - 1); }
+    /* After the Listener restarts its frame count (a resume): count frames from there, keeping Talk freely's time left
+       (`left`, read before the restart). */
+    resync(left) {
+      if (left == null) left = this.passLeft(); if (this.isOpen) this._setOpen(false, this.f);
+      this.f = Math.floor(this.L.fs.sTotal / 160); this.acc = 0; this.bn = 0; this.pw = [0, 0, 0]; this.over = false; this.run = 0; this.under = 0;
+      this.lastOver = -1e9; this.lastMeEnd = this.f; this.passUntil = left > 0 ? this.f + Math.round(left * 100) : -1; this.seg = null; this.st = null; this.ring.fill(0);
+    }
+    pass(sec, quiet) { this.passUntil = this.f + Math.round(sec * 100); if (!quiet) this.counts.freePass++; if (this.isOpen) { this.counts.talk--; this._setOpen(false, this.f); } }
+    passLeft() { return Math.max(0, (this.passUntil - this.f) / 100); }
+    frameNow() { return this.f; }
+    talking() { return this.over; }
+    push(chunk) {
+      if (!this.on) return;
+      const F = this.filters;
+      for (let i = 0; i < chunk.length; i++) {
+        let v = chunk[i]; for (let j = 0; j < F.length; j++) v = F[j](v);
+        this.acc += v * v;
+        if (++this.bn === 160) { this._frame(this.acc / 160); this.acc = 0; this.bn = 0; }
+      }
+    }
+    _frame(power) {
+      const f = this.f++, p = this.p, pw = this.pw;
+      pw[f % 3] = power; const db = 10 * Math.log10((pw[0] + pw[1] + pw[2]) / 3 + 1e-12); this.level = db;
+      // opening takes three 10 ms frames in a row over the line on their own (30 ms of sound), so a click can't; once
+      // open, the 30 ms level keeps it open
+      const above = db >= p.line; this.run = 10 * Math.log10(power + 1e-12) >= p.line ? this.run + 1 : 0;
+      if (above && (this.over || this.run >= 3)) {
+        if (!this.over && (f - this.lastOver > p.turnGap || this.otherAfter)) { this.turn = { talk: 0, nudged: false }; this.otherAfter = false; } // a new turn
+        const add = f - this.lastOver <= p.gap ? f - this.lastOver : 1; // short dips between words count as talk
+        this.counts.talkTime += add / 100; this.counts.meSec += add / 100;
+        if (f >= this.passUntil) this.turn.talk += add;
+        this.over = true; this.lastOver = f; this.lastMeEnd = f;
+      } else if (this.over && f - this.lastOver > p.hold) this.over = false;
+      // someone under the line talked after you (half a second of it, so the quiet end of your own words doesn't count)
+      this.under = !above && !this.over && this.L.speech ? (this.under || 0) + 1 : 0;
+      if (this.under >= 50) this.otherAfter = true;
+      if (this.collect && this.L.speech && this.collect.length < 6000) this.collect.push(db);
+      this._decide(f);
+      this.ring[f % 1600] = (above ? 1 : 0) | (this.isOpen ? 2 : 0);
+      const s = this.isOpen ? 'echo' : this.over ? 'hold' : this.L.speech ? 'other' : 'listening';
+      if (s !== this.st) { this.st = s; this._state(s); }
+    }
+    /* Silence: the echo whenever it's over the line. Conversation: the turn's talk first, with a nudge before the end. */
+    _decide(f) {
+      const p = this.p, t = this.turn;
+      let want = this.over && f >= this.passUntil;
+      if (want && p.limit > 0) {
+        if (p.nudge) {
+          const at = Math.max(0, p.limit - p.nudgeGrace);
+          if (!t.nudged) { if (t.talk >= at) { t.nudged = true; this.counts.nudge++; this.onEvent({ type: 'nudge' }); if (this.mode !== 'test') this.onNudge(); } want = false; }
+          else want = t.talk >= Math.max(p.limit, at + p.nudgeGrace);
+        } else want = t.talk >= p.limit;
+      }
+      if (want !== this.isOpen) this._setOpen(want, f);
+    }
+    _setOpen(open, f) {
+      this.isOpen = open;
+      if (open) { this.counts.talk++; this.echoAt = f; } else this.counts.talkSec += Math.max(0, f - this.echoAt) / 100;
+      if (this.mode !== 'test') this.onEcho(open);
+    }
+    _state(state) { this.onEvent({ type: 'state', state }); }
+    onReady() {}
+    onVad(ev) {
+      if (!this.on) return;
+      if (ev.type === 'onset') this.seg = { id: ++this.segId, start: ev.frame, speaker: 'unknown' };
+      else if (this.seg) this._endSeg(ev.frame);
+    }
+    /* A stretch of talk ended: it was you if a quarter of it was over the line; it echoed if the echo opened in it. */
+    _endSeg(e) {
+      const g = this.seg; this.seg = null;
+      const s = Math.max(g.start, e - 1500); let n = 0, open = false;
+      for (let f = s; f <= e; f++) { const r = this.ring[f % 1600]; if (r & 1) n++; if (r & 2) open = true; }
+      const me = n >= Math.max(5, 0.25 * (e - s + 1));
+      if (!me) { this.counts.other++; this.counts.otherSec += (e - g.start + 1) / 100; }
+      const rec = { id: g.id, start: g.start, end: e, speaker: me ? 'me' : 'other', echo: open, interrupt: false, passes: [], scores: [], margins: [], embs: [] };
+      this.history.push(rec); if (this.history.length > 30) this.history.shift();
+      this.onEvent({ type: 'segment', rec, counts: this.counts });
+    }
+  }
+
+  S.pipeline = { Listener, PhraseBook, Teacher, Controller, LevelGate, DEFAULT_PHRASES };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
 
 /* Samt mic: capture (AudioWorklet, ScriptProcessor fallback) resampled to 16 kHz, and the delayed echo path
-   (mic -> delay -> gate gain -> headphones). One AudioContext per page, created and resumed inside a tap (WebKit only
+   (mic -> delay -> muted pitches -> gate gain -> headphones). One AudioContext per page, created and resumed inside a tap (WebKit only
    starts audio from a user gesture). Watches for interruptions: calls, Siri, app switches, screen lock, route changes.
    Also: a test stand-in for the mic, and a small IndexedDB store that reconnects. Browser only. */
 (function (G) {
@@ -1624,7 +1804,7 @@ registerProcessor('samt-tap', SamtTap);
   class MicEngine {
     constructor({ onChunk, onTrouble } = {}) {
       this.onChunk = onChunk || (() => {}); this.onTrouble = onTrouble || (() => {});
-      this.delaySec = 0.2; this.vol = 1; this.open = false; this.live = false; this.path = null; this.ctx = null;
+      this.delaySec = 0.2; this.vol = 1; this.open = false; this.live = false; this.path = null; this.ctx = null; this.tones = []; this.notches = [];
     }
     /* Call FIRST and synchronously inside the tap handler, before any await. */
     prime() {
@@ -1652,7 +1832,7 @@ registerProcessor('samt-tap', SamtTap);
       this.src = ctx.createMediaStreamSource(this.stream);
       this.delay = ctx.createDelay(1.0); this.delay.delayTime.value = this.delaySec;
       this.gain = ctx.createGain(); this.gain.gain.value = 0;
-      this.src.connect(this.delay); this.delay.connect(this.gain); this.gain.connect(ctx.destination);
+      this.src.connect(this.delay); this.gain.connect(ctx.destination); this._chain(); // delay -> muted pitches -> gate
       this.sink = ctx.createGain(); this.sink.gain.value = 0; this.sink.connect(ctx.destination);
       let ok = false;
       if (!BAD_WORKLET && ctx.audioWorklet && typeof AudioWorkletNode !== 'undefined') {
@@ -1701,6 +1881,15 @@ registerProcessor('samt-tap', SamtTap);
       });
     }
     setDelay(sec) { this.delaySec = sec; if (this.delay) this.delay.delayTime.setTargetAtTime(sec, this.ctx.currentTime, 0.02); }
+    /* Muted sounds: one notch per pitch ([{f, q}]) between the delay and the gate, so they never reach the echo. */
+    setNotches(tones) { this.tones = (tones || []).slice(); if (this.delay && this.gain) this._chain(); }
+    _chain() {
+      try { this.delay.disconnect(); } catch (e) {}
+      for (const n of this.notches) { try { n.disconnect(); } catch (e) {} }
+      this.notches = this.tones.map(t => { const b = this.ctx.createBiquadFilter(); b.type = 'notch'; b.frequency.value = t.f; b.Q.value = t.q; return b; });
+      let node = this.delay; for (const b of this.notches) { node.connect(b); node = b; }
+      node.connect(this.gain);
+    }
     setVolume(v) { this.vol = Math.min(1, v); if (this.open) this.setEcho(true); }
     _release() {
       try { if (this.stream) this.stream.getTracks().forEach(t => { t.onended = t.onmute = t.onunmute = null; t.stop(); }); } catch (e) {}
@@ -1712,10 +1901,10 @@ registerProcessor('samt-tap', SamtTap);
       try { if (this.gain) this.gain.gain.value = 0; } catch (e) {}
       try { navigator.mediaDevices.removeEventListener('devicechange', this._dev); } catch (e) {}
       this._release();
-      for (const n of [this.src, this.tap, this.sp, this.delay, this.gain, this.sink]) { try { if (n) n.disconnect(); } catch (e) {} }
+      for (const n of [this.src, this.tap, this.sp, this.delay, this.gain, this.sink, ...this.notches]) { try { if (n) n.disconnect(); } catch (e) {} }
       if (this.tap) this.tap.port.onmessage = null;
       if (this.sp) this.sp.onaudioprocess = null;
-      this.src = this.tap = this.sp = this.delay = this.gain = this.sink = null;
+      this.src = this.tap = this.sp = this.delay = this.gain = this.sink = null; this.notches = [];
       try { if (this.ctx && this.ctx.state === 'running') this.ctx.suspend(); } catch (e) {}
     }
   }
@@ -1745,6 +1934,7 @@ registerProcessor('samt-tap', SamtTap);
     setEcho(open) { this.open = open; this.echoLog.push([+this.t.toFixed(2), open]); }
     chime() { this.echoLog.push([+this.t.toFixed(2), 'chime']); }
     setDelay() {} setVolume() {}
+    setNotches(tones) { this.tones = (tones || []).slice(); }
     stop() { /* the test keeps one fake mic for the whole run */ }
   }
 
@@ -1804,7 +1994,8 @@ registerProcessor('samt-tap', SamtTap);
 (function () {
   'use strict';
   const S = window.Samt, MODE = window.SAMT_MODE, CFG = window.SAMT_CONFIG || {};
-  const { Listener, PhraseBook, Teacher, Controller } = S.pipeline;
+  const { Listener, Teacher, Controller, LevelGate } = S.pipeline;
+  const { st } = S.models;
   const $ = id => document.getElementById(id);
   const params = new URLSearchParams(location.search);
   const FAKE = params.has('fakemic');
@@ -1826,24 +2017,32 @@ registerProcessor('samt-tap', SamtTap);
   ];
 
   /* ---------- settings (per device) ---------- */
-  const DEF = { mins: 30, delay: 200, vol: 100, strict: 0, psens: 0, kind: 'silence', limit: 15, noInterrupt: true, nudge: true };
+  // who: what turns the echo on. 'voice' = Samt's voice check (Your voice); 'level' = anything over the line (Sound level)
+  const DEF = { mins: 30, delay: 200, vol: 100, strict: 0, kind: 'silence', limit: 15, noInterrupt: true, nudge: true, who: 'voice' };
   const settings = Object.assign({}, DEF, (() => { try { return JSON.parse(localStorage.getItem('samt.' + MODE + '.settings') || '{}'); } catch (e) { return {}; } })());
-  settings.vol = Math.min(100, settings.vol); settings.strict = Math.max(-1, Math.min(1, Math.round(settings.strict))); settings.psens = Math.max(-1, Math.min(1, Math.round(settings.psens)));
+  settings.vol = Math.min(100, settings.vol); settings.strict = Math.max(-1, Math.min(1, Math.round(settings.strict))); delete settings.psens;
   settings.kind = settings.kind === 'conversation' ? 'conversation' : 'silence'; settings.limit = Math.max(5, Math.min(60, Math.round(+settings.limit || 15)));
+  settings.who = settings.who === 'level' ? 'level' : 'voice';
   const saveSettings = () => { try { localStorage.setItem('samt.' + MODE + '.settings', JSON.stringify(settings)); } catch (e) {} };
   const strictValue = () => settings.strict * 1.6;          // threshold moves by 0.8 of your score spread per step
-  const phraseSens = () => 1 - settings.psens * 0.1;        // looser = 1.1, stricter = 0.9
   // Conversation: talk this long in a turn before the echo; at once when talking over someone; a tone first
   const convParams = () => settings.kind === 'conversation' ? { limit: settings.limit * 100, interrupt: !!settings.noInterrupt, nudge: !!settings.nudge } : { limit: 0, interrupt: false, nudge: false };
-  /* Shared by Light and Neural on this device: the budget, the cards, the sign, the reminders switch. */
-  const SDEF = { budget: 20, remind: true, sign: "I'm keeping quiet", cards: [], remindAt: 0 };
+  /* Shared by Light and Neural on this device: the budget, the cards, the sign, the reminders switch, and for Sound
+     level the line (dB; null = not set yet, so it comes from the setup recordings) and the muted sounds. */
+  const LINE_MIN = -66, LINE_MAX = -16, MAX_MUTES = 4;
+  const clampLine = v => Math.max(LINE_MIN, Math.min(LINE_MAX, Math.round(v)));
+  const okTone = t => t && Number.isFinite(+t.f) && +t.f >= 40 && +t.f <= 7600 && Number.isFinite(+t.q) && +t.q > 0;
+  const SDEF = { budget: 20, remind: true, sign: "I'm keeping quiet", cards: [], remindAt: 0, line: null, mutes: [] };
   const shared = Object.assign({}, SDEF, (() => { try { return JSON.parse(localStorage.getItem('samt.shared') || '{}'); } catch (e) { return {}; } })());
   shared.budget = Math.max(5, Math.min(240, Math.round(+shared.budget || 20))); if (!Array.isArray(shared.cards)) shared.cards = [];
+  const cleanMutes = list => (Array.isArray(list) ? list : []).filter(m => m && Array.isArray(m.tones) && m.tones.length && m.tones.every(okTone))
+    .map(m => ({ id: String(m.id || 'm' + Date.now().toString(36)), kind: ['hum', 'tone', 'whine'].includes(m.kind) ? m.kind : 'tone', tones: m.tones.slice(0, 6).map(t => ({ f: +t.f, q: +t.q })), at: +m.at || 0 })).slice(-MAX_MUTES);
+  shared.line = shared.line == null || !Number.isFinite(+shared.line) ? null : clampLine(+shared.line); shared.mutes = cleanMutes(shared.mutes);
   const saveShared = () => { try { localStorage.setItem('samt.shared', JSON.stringify(shared)); } catch (e) {} };
 
   /* ---------- state ---------- */
   const listener = new Listener(), teacher = new Teacher(listener);
-  let voice = null, book = new PhraseBook(), ctrl = null, busy = null;
+  let voice = null, ctrl = null, busy = null, gateTap = null, capture = null; // gateTap: the Sound level gate fed the raw audio
   let profile = { meSegs: [], othSegs: [], adaptSegs: [] };
   let ortSession = null, modelP = null, modelMs = 0;
   let session = null; // {mode, endAt, startedAt, timer, paused}
@@ -1851,7 +2050,7 @@ registerProcessor('samt-tap', SamtTap);
   let history = [], endRec = null, endMood = null, moodCtl = null, showCtx = null, cardsEditing = false, txtResolve = null, strictCtl = null;
   const mic = FAKE ? new S.mic.FakeMic({ onChunk: onAudio }) : new S.mic.MicEngine({ onChunk: onAudio, onTrouble });
   if (FAKE) mic.speed = +(params.get('speed') || 1);
-  const debug = window.SamtDebug = { listener, mic, get ctrl() { return ctrl; }, get voice() { return voice; }, get book() { return book; }, get engine() { return mic; }, profile: () => profile, events: [], checkLog: [] };
+  const debug = window.SamtDebug = { listener, mic, get ctrl() { return ctrl; }, get voice() { return voice; }, get engine() { return mic; }, profile: () => profile, events: [], checkLog: [] };
 
   const feats = s => ({ n: s.n, vec: s.vec, f0: s.f0, eDb: s.eDb });
   const frames = segs => segs.reduce((a, s) => a + s.n, 0);
@@ -1860,6 +2059,8 @@ registerProcessor('samt-tap', SamtTap);
 
   function onAudio(c) {
     listener.push(c);
+    if (gateTap) gateTap.push(c);
+    if (capture) capture.add(c);
     // feedback guard: echo open and the mic pinned near full scale = the echo is coming back through a speaker
     if (mic.open) { howl = listener.level > -9 ? howl + 1 : 0; if (howl > 25) { holdEcho(4000); note('The echo was feeding back into the mic, so it stopped for a moment. Use headphones.'); } }
     else howl = 0;
@@ -1970,7 +2171,7 @@ registerProcessor('samt-tap', SamtTap);
     if (mic.live) { mic.prime(); return Promise.resolve(mic); }
     if (starting) return starting;
     mic.prime();
-    starting = mic.start().then(() => { starting = null; mic.setDelay(settings.delay / 1000); mic.setVolume(settings.vol / 100); startMeter(); return mic; }, e => { starting = null; throw e; });
+    starting = mic.start().then(() => { starting = null; mic.setDelay(settings.delay / 1000); mic.setVolume(settings.vol / 100); mic.setNotches(allTones()); startMeter(); return mic; }, e => { starting = null; throw e; });
     return starting;
   }
   function releaseMic() { mic.stop(); $('level').style.transform = 'scaleX(0)'; }
@@ -1979,8 +2180,9 @@ registerProcessor('samt-tap', SamtTap);
     if (meterOn) return; meterOn = true;
     const loop = () => {
       if (!mic.live) { meterOn = false; return; }
-      const x = Math.max(0, Math.min(1, (listener.level + 70) / 55));
-      $('level').style.transform = `scaleX(${x.toFixed(3)})`;
+      // Sound level: the bar shows what the gate measures (muted pitches cut) and turns dark while it's over the line
+      const g = gateTap, lv = g ? g.level : listener.level, x = Math.max(0, Math.min(1, (lv + 70) / 55));
+      $('level').style.transform = `scaleX(${x.toFixed(3)})`; $('level').parentNode.classList.toggle('over', !!(g && lv >= g.p.line));
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
@@ -1990,6 +2192,7 @@ registerProcessor('samt-tap', SamtTap);
     if (kind === 'unmuted') return;
     // interrupted (call, Siri, lock, app switch), muted, or ended: stop the echo at once and ask for a tap
     mic.setEcho(false);
+    if (capture) cancelMute('The mic stopped. Try again.'); // listening to a sound to mute
     if (session && !session.paused) { session.paused = true; if (ctrl) ctrl.cut(); live('paused', 'Paused. Tap Resume.'); render(); }
     else if (rec && (rec.kind === 'me' || rec.kind === 'oth')) {
       // a call or Siri mid-reading: keep what was read, wait for Resume
@@ -2004,7 +2207,9 @@ registerProcessor('samt-tap', SamtTap);
     try {
       if (!mic.trackLive()) { mic.stop(); await ensureMic(); }
       else if (!(await mic.resume())) throw Object.assign(new Error('x'), { name: 'AudioNotRunning' });
-      listener.reset(); session.paused = false; note(''); live('on', session.mode === 'test' ? 'Testing. Listening' : 'Listening'); render();
+      const left = ctrl ? ctrl.passLeft() : 0; // Talk freely's time left, read before the Listener's frames start again
+      listener.reset(); if (ctrl && ctrl.resync) ctrl.resync(left);
+      session.paused = false; note(''); live('on', session.mode === 'test' ? 'Testing. Listening' : 'Listening'); render();
     } catch (e) { note(micError(e)); }
   }
 
@@ -2012,14 +2217,12 @@ registerProcessor('samt-tap', SamtTap);
   async function saveAll() {
     const ok = await store.set(K('profile'), profile);
     if (voice && voice.ready) await store.set(K('voice'), voice.toJSON());
-    await store.set(K('phrases'), book.toJSON());
     if (!ok) toast("Couldn't save the setup on this device.");
     try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
   }
   async function loadAll() {
-    const [p, v, b] = await Promise.all([store.get(K('profile')), store.get(K('voice')), store.get(K('phrases'))]);
+    const [p, v] = await Promise.all([store.get(K('profile')), store.get(K('voice'))]);
     if (p) profile = Object.assign({ meSegs: [], othSegs: [], adaptSegs: [] }, p);
-    if (b) { try { book = PhraseBook.fromJSON(b); } catch (e) {} }
     if (v) { try { voice = MODE === 'light' ? S.LightVoice.fromJSON(v) : S.NeuralVoice.fromJSON(v); } catch (e) { voice = null; } }
     if (voice && MODE === 'neural' && ortSession) voice.attach(window.ort, ortSession);
   }
@@ -2034,8 +2237,9 @@ registerProcessor('samt-tap', SamtTap);
   }
   async function dropRecord(id) { await loadHistory(); history = history.filter(r => r.id !== id); await store.set('shared:history', history); }
   function backup() {
-    const data = { app: 'samt', mode: MODE, version: 3, saved: new Date().toISOString(), settings, profile: S.mic.pack(profile), voice: voice && voice.ready ? S.mic.pack(voice.toJSON()) : null, phrases: S.mic.pack(book.toJSON()),
-      shared: { budget: shared.budget, remind: shared.remind, sign: shared.sign, cards: shared.cards }, history };
+    // phrases: none recorded; the field is there only so a v6 page (which expects it) can still restore this file
+    const data = { app: 'samt', mode: MODE, version: 4, saved: new Date().toISOString(), settings, profile: S.mic.pack(profile), voice: voice && voice.ready ? S.mic.pack(voice.toJSON()) : null,
+      phrases: S.mic.pack(new S.pipeline.PhraseBook().toJSON()), shared: { budget: shared.budget, remind: shared.remind, sign: shared.sign, cards: shared.cards, line: shared.line, mutes: shared.mutes }, history };
     const url = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
     const a = document.createElement('a'); a.href = url; a.download = `samt-${MODE}-backup-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000);
@@ -2045,8 +2249,7 @@ registerProcessor('samt-tap', SamtTap);
       const d = JSON.parse(await file.text());
       if (!d || d.app !== 'samt') throw new Error("This isn't a Samt backup file.");
       if (d.mode !== MODE) throw new Error(`This backup is from Samt ${d.mode === 'neural' ? 'Neural' : 'Light'}. Open that version to restore it.`);
-      profile = Object.assign({ meSegs: [], othSegs: [], adaptSegs: [] }, S.mic.unpack(d.profile));
-      book = PhraseBook.fromJSON(S.mic.unpack(d.phrases));
+      profile = Object.assign({ meSegs: [], othSegs: [], adaptSegs: [] }, S.mic.unpack(d.profile)); // an older backup's phrases are left out
       voice = d.voice ? (MODE === 'light' ? S.LightVoice.fromJSON(S.mic.unpack(d.voice)) : S.NeuralVoice.fromJSON(S.mic.unpack(d.voice))) : null;
       if (voice && MODE === 'neural' && ortSession) voice.attach(window.ort, ortSession);
       if (d.shared && typeof d.shared === 'object') {
@@ -2054,6 +2257,8 @@ registerProcessor('samt-tap', SamtTap);
         if (typeof d.shared.remind === 'boolean') shared.remind = d.shared.remind;
         if (typeof d.shared.sign === 'string' && d.shared.sign.trim()) shared.sign = d.shared.sign.slice(0, 60);
         if (Array.isArray(d.shared.cards)) shared.cards = d.shared.cards.filter(c => typeof c === 'string' && c.trim()).map(c => c.slice(0, 120)).slice(-24);
+        if (d.shared.line != null && Number.isFinite(+d.shared.line)) shared.line = clampLine(+d.shared.line);
+        if (Array.isArray(d.shared.mutes)) { shared.mutes = cleanMutes(d.shared.mutes); applyMutes(); }
         saveShared();
       }
       if (Array.isArray(d.history)) {
@@ -2100,11 +2305,11 @@ registerProcessor('samt-tap', SamtTap);
 
   /* ---------- teaching ---------- */
   let rec = null; // the open recording sheet
-  function openPanel({ title, passage, hint, showSkip, rtl }) {
-    const t = $('recTitle'); t.textContent = title; t.className = rtl ? 'ar' : ''; t.dir = rtl ? 'rtl' : 'auto';
+  function openPanel({ title, passage, hint }) {
+    $('recTitle').textContent = title;
     const p = $('recPassage'); p.hidden = !passage; p.textContent = passage || '';
     $('recHint').textContent = hint || ''; $('recProg').style.transform = 'scaleX(0)';
-    $('recDone').textContent = 'Done'; $('recDone').disabled = true; $('recSkip').hidden = !showSkip; $('recResume').hidden = true;
+    $('recDone').textContent = 'Done'; $('recDone').disabled = true; $('recResume').hidden = true;
     if ($('recPanel').hidden) {
       $('recScrim').hidden = false; $('recPanel').hidden = false;
       requestAnimationFrame(() => requestAnimationFrame(() => { $('recScrim').classList.add('show'); $('recPanel').classList.add('show'); }));
@@ -2171,7 +2376,6 @@ registerProcessor('samt-tap', SamtTap);
         else if (kind === 'me') await voice.addPositive(segs, prog);
         else await voice.addNegative(segs, prog);
       }
-      book.setStats(profile.meSegs); book.calibrate(profile.meSegs);
       await saveAll();
       if (wiz.check) { wiz.check.stale = true; saveWiz(); } // the last check was of the voice before this
       toast(kind === 'me' ? 'Learned your voice.' : 'Learned what other voices sound like.');
@@ -2179,47 +2383,101 @@ registerProcessor('samt-tap', SamtTap);
     live('off', 'Ready'); setBusy(null);
     if (kind === 'me' && wantEchoTest && voice && voice.ready) { wantEchoTest = false; openEchoTest(); } // setup's last step
   }
-  function recordPhrases(ids) {
-    if (busy || !ids.length) return;
-    const started = ensureMic();
-    note(''); setBusy('phrase');
-    let qi = 0, got = [];
-    const NEED = 3;
-    const show = (msg) => {
-      const p = book.get(ids[qi]);
-      openPanel({ title: p.label, rtl: !!p.rtl, hint: msg || `Say it now. Take ${got.length + 1} of ${NEED}` + (ids.length > 1 ? `, phrase ${qi + 1} of ${ids.length}` : ''), showSkip: ids.length > 1 });
-      $('recProg').style.transform = `scaleX(${(got.length / NEED).toFixed(3)})`;
-      $('recDone').disabled = got.length < 2;
-    };
-    const next = async (keep) => {
-      if (keep && got.length >= 2) book.get(ids[qi]).takes = got;
-      got = []; qi++;
-      if (qi >= ids.length) { await endRec(false); return; }
-      show();
-    };
-    const endRec = async (cancel) => {
-      if (!rec) return; rec = null; teacher.end(); closePanel(); releaseMic();
-      setBusy('learning'); live('busy', 'Learning your phrases'); await tick();
-      book.calibrate(profile.meSegs); await saveAll();
-      live('off', 'Ready'); setBusy(null); if (!cancel) toast('Phrases saved.');
-    };
-    rec = { kind: 'phrase', finish: (cancel) => cancel ? endRec(true) : next(true), skip: () => next(false) };
-    show('Starting the mic');
-    started.then(() => {
-      if (!rec || rec.kind !== 'phrase') return;
-      listener.reset();
-      teacher.begin({
-        mode: 'take',
-        onTake: (seg, why) => {
-          if (!rec) return;
-          if (!seg) { show(why === 'short' ? 'That was too short. Say it again.' : 'That was too long. Say only the phrase.'); return; }
-          got.push(feats(seg));
-          if (got.length >= NEED) next(true); else show();
-        }
-      });
-      show();
-    }, e => { rec = null; closePanel(); setBusy(null); note(micError(e)); });
+  /* ---------- Sound level: the line, and muted sounds ---------- */
+  /* Where the line starts before it's set: between your reading and the other voices from the setup if they're apart,
+     else 10 dB under your reading; -40 dB with no setup. In 2 dB steps, like the − and + buttons. */
+  function defaultLine() {
+    const loud = segs => { const a = []; for (const s of segs || []) { const e = s && s.eDb; if (e) for (let i = 0; i < e.length; i++) if (e[i] > -55) a.push(e[i]); } return a.length >= 50 ? st.median(a) : null; };
+    const me = loud(profile.meSegs), oth = loud(profile.othSegs);
+    const v = me == null ? -40 : oth != null && me - oth >= 6 ? (me + oth) / 2 : me - 10;
+    return clampLine(2 * Math.round(v / 2));
   }
+  const lineNow = () => shared.line != null ? shared.line : defaultLine();
+  const holdFrames = () => Math.round((settings.delay + 150) / 10); // outlasts the echo's delay, so a word's end isn't cut
+  function setLine(v) {
+    shared.line = clampLine(v); saveShared();
+    for (const g of [ctrl, check && check.ctrl]) if (g && g.kind === 'level') g.p.line = shared.line;
+    renderLine();
+  }
+  function renderLine() {
+    const v = lineNow(), x = Math.max(0, Math.min(1, (v + 70) / 55));
+    $('lineMark').style.left = (100 * x).toFixed(1) + '%';
+    $('lineSr').textContent = `Line ${Math.round((v - LINE_MIN) / 2) + 1} of ${(LINE_MAX - LINE_MIN) / 2 + 1}`;
+    $('lineDown').disabled = v <= LINE_MIN; $('lineUp').disabled = v >= LINE_MAX;
+  }
+  const allTones = () => [].concat(...shared.mutes.map(m => m.tones));
+  function applyMutes() {
+    const t = allTones(); mic.setNotches(t); if (gateTap) gateTap.setNotches(t);
+    if (wiz.check && wiz.check.who === 'level') { wiz.check.stale = true; saveWiz(); } // the line now measures differently
+  }
+  const MUTE_KIND = { hum: 'Low hum', tone: 'Steady tone', whine: 'Whine' };
+  const MUTE_SEC = 3;
+  /* Mute a sound: listen 3 s while it plays and you're quiet, find its steady pitches, cut them from the echo and the
+     level. A sound spread over every pitch has none, and nothing is saved. In a session the echo stays shut meanwhile. */
+  function muteSound() {
+    if (capture || shared.mutes.length >= MAX_MUTES || (!session && busy) || (session && session.paused)) return;
+    const inSession = !!session, started = inSession ? Promise.resolve() : ensureMic(); // the mic starts inside the tap
+    if (!inSession) setBusy('mute');
+    const k = capture = { inSession, parts: [], n: 0, add(c) { if (this.n < MUTE_SEC * 16000) { this.parts.push(Float32Array.from(c)); this.n += c.length; } } };
+    $('muteGo').disabled = true; $('muteProg').parentNode.hidden = false; $('muteProg').style.transform = 'scaleX(0)';
+    $('muteResult').textContent = 'Stay quiet. Listening to the sound…'; $('muteResult').className = 'cstatus';
+    started.then(() => {
+      if (capture !== k) return;
+      if (inSession) holdEcho(MUTE_SEC * 1000 + 800);
+      const t0 = Date.now();
+      k.timer = setInterval(() => {
+        $('muteProg').style.transform = `scaleX(${Math.min(1, k.n / (MUTE_SEC * 16000)).toFixed(3)})`;
+        if (k.n >= MUTE_SEC * 16000) finishMute(k);
+        else if (Date.now() - t0 > (MUTE_SEC + 4) * 1000) cancelMute("The sound stopped reaching Samt before it had 3 seconds. Try again."); // the audio stopped coming
+      }, 100);
+    }, e => { if (capture === k) capture = null; if (!inSession) setBusy(null); $('muteProg').parentNode.hidden = true; $('muteResult').textContent = micError(e); renderMutes(); });
+  }
+  /* Stop listening without muting anything: the mic stopped, the session ended, or the sheet was closed. */
+  function cancelMute(msg) {
+    const k = capture; if (!k) return; capture = null; clearInterval(k.timer);
+    if (!k.inSession) { releaseMic(); setBusy(null); }
+    $('muteProg').parentNode.hidden = true; $('muteResult').textContent = msg || ''; $('muteResult').className = 'cstatus';
+    renderMutes();
+  }
+  function finishMute(k) {
+    clearInterval(k.timer); if (capture === k) capture = null;
+    const inSession = k.inSession;
+    if (!inSession) { releaseMic(); setBusy(null); }
+    $('muteProg').parentNode.hidden = true;
+    const raw = new Float32Array(k.n); let o = 0; for (const p of k.parts) { raw.set(p, o); o += p.length; }
+    const x = S.dsp.applyNotches(raw, allTones()), skip = 3200; // what Samt hears now, with the sounds already muted
+    const before = S.dsp.levelDb(x, skip), tones = before > -62 ? S.dsp.findTones(x.subarray(skip)) : [];
+    const after = tones.length ? S.dsp.levelDb(S.dsp.applyNotches(x, tones), skip) : before;
+    let msg, good = false;
+    if (before <= -62) msg = "Samt didn't hear a sound to mute. Try again while it's going.";
+    else if (!tones.length || before - after < 3) msg = "That sound is spread over every pitch, so cutting it would cut your voice too. Nothing was muted. Raise the line above it instead.";
+    else {
+      const top = tones[0].f, kind = top < 300 ? 'hum' : top < 2000 ? 'tone' : 'whine';
+      shared.mutes = shared.mutes.concat([{ id: 'm' + Date.now().toString(36), kind, tones, at: Date.now() }]).slice(-MAX_MUTES); saveShared(); applyMutes();
+      good = true;
+      msg = settings.who !== 'level' ? 'Muted. The echo no longer plays it.'
+        : after < lineNow() ? 'Muted. It now sits under your line, so it no longer turns the echo on.'
+        : "Muted, but it's still over your line. Raise the line a little.";
+    }
+    $('muteResult').textContent = msg; $('muteResult').className = 'cstatus' + (good ? ' good' : '');
+    renderMutes(); render();
+  }
+  function renderMutes() {
+    const box = $('muteList'); box.textContent = '';
+    for (const m of shared.mutes) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'row';
+      const t = document.createElement('span'); t.className = 'rt'; t.textContent = MUTE_KIND[m.kind] || 'A sound';
+      const s2 = document.createElement('span'); s2.className = 'r2'; s2.textContent = m.tones.map(x => Math.round(x.f)).join(' · ') + ' Hz'; t.appendChild(s2);
+      b.append(t, chevron());
+      b.onclick = () => ask({ title: MUTE_KIND[m.kind] || 'This sound', msg: 'Unmute it? It will reach the echo again.', actions: [{ label: 'Unmute', danger: true, run: () => { shared.mutes = shared.mutes.filter(x => x.id !== m.id); saveShared(); applyMutes(); renderMutes(); render(); } }] });
+      box.appendChild(b);
+    }
+    box.hidden = !shared.mutes.length; $('muteNone').hidden = !!shared.mutes.length;
+    const full = shared.mutes.length >= MAX_MUTES;
+    $('muteGo').disabled = !!capture || full || (!session && !!busy) || !!(session && session.paused); $('muteFull').hidden = !full;
+  }
+  function openMutes() { $('muteResult').textContent = ''; $('muteProg').parentNode.hidden = true; renderMutes(); openSheet('mute'); }
+  closers.mute = () => { if (capture) cancelMute(''); closeSheet('mute'); };
 
   /* ---------- session ---------- */
   function plannedMs() {
@@ -2229,6 +2487,12 @@ registerProcessor('samt-tap', SamtTap);
   }
   function stateText(e) {
     const test = session && session.mode === 'test';
+    if (session && session.who === 'level') {
+      if (e.state === 'echo') return ['echo', test ? 'Over the line. The echo would be on' : 'Over the line. Echo on'];
+      if (e.state === 'hold') return ['hold', 'Over the line'];
+      if (e.state === 'other') return ['other', 'Under the line. Ignored'];
+      return ['on', test ? 'Testing. Listening' : 'Listening'];
+    }
     if (e.state === 'echo') {
       const over = !!(ctrl && ctrl.seg && ctrl.seg.interrupt);
       return ['echo', over ? (test ? 'Talking over someone. The echo would be on' : 'Talking over someone. Echo on') : (test ? 'You. The echo would be on' : 'You. Echo on')];
@@ -2246,17 +2510,21 @@ registerProcessor('samt-tap', SamtTap);
       if (performance.now() < phraseShowUntil && e.state !== 'echo') return;
       const [s, t] = stateText(e); live(s, t);
     }
-    else if (e.type === 'phrase') { const p = book.get(e.phrase); live('pass', 'Passed: ' + (p ? p.label : 'a phrase')); phraseShowUntil = performance.now() + 1500; renderCounts(); }
     else if (e.type === 'nudge') { live('hold', session && session.mode === 'test' ? 'A nudge would play now' : 'Nudge: time to wrap up'); phraseShowUntil = performance.now() + 2000; renderCounts(); }
     else if (e.type === 'interrupt') renderCounts();
     else if (e.type === 'segment') { lastRec = e.rec; renderCounts(); renderLast(); }
   }
   function renderCounts() {
-    const c = ctrl ? ctrl.counts : { talk: 0, talkTime: 0, pass: 0, short: 0, other: 0, interrupt: 0, nudge: 0 };
+    const c = ctrl ? ctrl.counts : { talk: 0, talkTime: 0, short: 0, other: 0, interrupt: 0, nudge: 0 };
     $('cTalk').textContent = c.talk; $('cTalkTime').textContent = clock(c.talkTime);
-    $('cPass').textContent = c.pass; $('cShort').textContent = c.short; $('cOther').textContent = c.other;
+    $('cShort').textContent = c.short; $('cOther').textContent = c.other;
     $('cInt').textContent = c.interrupt || 0; $('cNudge').textContent = c.nudge || 0;
     $('nudgeRow').hidden = (session ? session.kind : settings.kind) !== 'conversation';
+    // Sound level can't tell short replies or talking over someone; its "others" are stretches under the line
+    const lv = (session ? session.who : settings.who) === 'level';
+    $('shortRow').hidden = $('intRow').hidden = lv;
+    $('tlHint').textContent = lv ? 'You and Others: talking over the line, and under it.' : 'You and Others: how much of the talking Samt heard was you.';
+    $('muteStatus2').textContent = shared.mutes.length ? String(shared.mutes.length) : 'None';
     renderTL();
   }
   /* You and others: the share of the talking Samt heard that was you (the current stretch included). */
@@ -2273,7 +2541,7 @@ registerProcessor('samt-tap', SamtTap);
   }
   function renderLast() {
     const r = lastRec;
-    if (!r) { $('last').hidden = true; return; }
+    if (!r || (session && session.who === 'level')) { $('last').hidden = true; return; } // corrections teach the voice check only
     const who = r.speaker === 'me' ? 'You' : r.speaker === 'other' ? 'Someone else' : 'Not sure';
     const what = r.echo ? 'echoed' : r.passes.length ? 'passed' : r.speaker === 'other' ? 'ignored' : 'let through';
     $('lastText').textContent = `${who}, ${what}, ${((r.end - r.start + 1) / 100).toFixed(1)} s`;
@@ -2302,20 +2570,60 @@ registerProcessor('samt-tap', SamtTap);
     catch (e) { note(e.message || String(e)); }
     live('off', 'Ready'); setBusy(null);
   }
+  const voiceUsable = () => !!(voice && voice.ready) && (MODE !== 'neural' || !!ortSession);
+  /* What decides the echo: the voice check (Your voice) or the line (Sound level). counts and lastMeEnd carry a
+     running session's numbers over when it switches. */
+  function makeJudge(mode, counts, lastMeEnd) {
+    const m = mode === 'test' ? 'test' : 'silence', onNudge = () => { if (mic.chime) mic.chime(); };
+    if (settings.who === 'level') {
+      const g = new LevelGate({ listener, onEcho: setEcho, onEvent, onNudge, params: Object.assign({ line: lineNow(), hold: holdFrames() }, convParams()) });
+      g.setNotches(allTones()); g.start(m, counts, lastMeEnd); gateTap = g; return g;
+    }
+    gateTap = null; voice.strict = strictValue();
+    const c = new Controller({ listener, voice, book: null, onEcho: setEcho, onEvent, onNudge, params: convParams() });
+    c.start(m, counts, lastMeEnd); return c;
+  }
+  /* Your voice / Sound level, from Home or mid-session. A running session keeps its numbers and its Talk freely. */
+  function setWho(v) {
+    if (v === settings.who) return;
+    if (v === 'voice' && !voiceUsable()) { syncWho(); toast(voice && voice.ready ? 'The voice model is still loading.' : 'Teach Samt your voice first.'); return; }
+    settings.who = v; saveSettings();
+    if (session && ctrl && !session.paused) {
+      const counts = ctrl.counts, left = ctrl.passLeft();
+      try { if (ctrl.seg) ctrl.cut(); } catch (e) {} // closing the stretch still going can move "last talked" on
+      const last = ctrl.lastMeEnd;
+      if (ctrl.adaptQueue && ctrl.adaptQueue.length) session.adaptQ = session.adaptQ.concat(ctrl.adaptQueue);
+      ctrl.stop(); setEcho(false);
+      ctrl = makeJudge(session.mode, counts, last);
+      if (left > 0) ctrl.pass(left, true);
+      session.who = v; if (v === 'level') session.usedLevel = true;
+      lastRec = null; renderLast(); renderCounts(); renderLine();
+      live('on', session.mode === 'test' ? 'Testing. Listening' : 'Listening');
+    }
+    syncWho(); render();
+  }
+  let whoCtl = null, sWhoCtl = null; // the two pickers: Home's and the session screen's (render() enables them)
+  function syncWho() {
+    for (const c of [whoCtl, sWhoCtl]) if (c) c.set(settings.who);
+    const lv = (session ? session.who : settings.who) === 'level';
+    document.body.classList.toggle('lv-mode', lv);
+    for (const id of ['lineDown', 'lineUp', 'lineMark']) $(id).hidden = !lv;
+    if (lv) renderLine();
+  }
   function startSession(mode) {
     if (busy) return;
-    if (!voice || !voice.ready) { note('Teach Samt your voice first: Teach Samt, Your voice.'); return; }
-    if (MODE === 'neural' && !ortSession) { note('The voice model is still loading.'); return; }
+    const lv = settings.who === 'level';
+    if (!lv && (!voice || !voice.ready)) { note('Teach Samt your voice first, or pick Sound level.'); return; }
+    if (!lv && MODE === 'neural' && !ortSession) { note('The voice model is still loading. Sound level works now.'); return; }
     requestWake();                 // inside the tap, before anything waits
     const started = ensureMic();
     note(''); setBusy(mode);
     started.then(() => {
       listener.reset();
-      voice.strict = strictValue(); book.sens = phraseSens();
-      ctrl = new Controller({ listener, voice, book, onEcho: setEcho, onEvent, onNudge: () => { if (mic.chime) mic.chime(); }, params: convParams() });
-      ctrl.start(mode === 'test' ? 'test' : 'silence');
+      ctrl = makeJudge(mode);
       const now = Date.now();
-      session = { mode, kind: settings.kind, startedAt: now, endAt: mode === 'test' ? null : now + plannedMs(), paused: false, bestQuiet: 0, recId: 's' + now.toString(36), savedAt: now, uiAt: 0, warned: 0, passing: false };
+      session = { mode, kind: settings.kind, who: settings.who, usedLevel: lv, adaptQ: [], startedAt: now, endAt: mode === 'test' ? null : now + plannedMs(), paused: false, bestQuiet: 0, recId: 's' + now.toString(36), savedAt: now, uiAt: 0, warned: 0, passing: false };
+      syncWho();
       lastRec = null; renderLast(); renderCounts(); enterSession(); render();
       if (mode !== 'test') showSessionReminder(); else $('remind').hidden = true;
       session.timer = setInterval(tickSession, 250); tickSession();
@@ -2325,8 +2633,8 @@ registerProcessor('samt-tap', SamtTap);
   function sessionSnap() {
     const s = session; if (!s || s.mode === 'test' || !ctrl) return null;
     const c = ctrl.counts;
-    return { id: s.recId, at: s.startedAt, dur: FAKE ? Math.round(listener.fs.nFrames / 100) : Math.max(0, Math.round((Date.now() - s.startedAt) / 1000)), page: MODE, kind: s.kind, talkTime: +c.talkTime.toFixed(2), meSec: +c.meSec.toFixed(2), otherSec: +c.otherSec.toFixed(2),
-      talks: c.talk, interrupts: c.interrupt, nudges: c.nudge, freePass: c.freePass, phrases: c.pass, shorts: c.short, others: c.other, bestQuiet: Math.round(s.bestQuiet) };
+    return { id: s.recId, at: s.startedAt, dur: FAKE ? Math.round(listener.fs.nFrames / 100) : Math.max(0, Math.round((Date.now() - s.startedAt) / 1000)), page: MODE, kind: s.kind, who: s.usedLevel ? 'level' : 'voice', talkTime: +c.talkTime.toFixed(2), meSec: +c.meSec.toFixed(2), otherSec: +c.otherSec.toFixed(2),
+      talks: c.talk, interrupts: c.interrupt, nudges: c.nudge, freePass: c.freePass, shorts: c.short, others: c.other, bestQuiet: Math.round(s.bestQuiet) };
   }
   function tickSession() {
     if (!session) return;
@@ -2334,8 +2642,8 @@ registerProcessor('samt-tap', SamtTap);
     else $('sReadout').textContent = fmt((Date.now() - session.startedAt) / 1000);
     if (!ctrl || session.paused) return;
     // the quiet timer: since your last words (or since the start)
-    const g = ctrl.seg, talking = !!(g && g.speaker === 'me');
-    const quiet = talking ? 0 : Math.max(0, (listener.fs.nFrames - ctrl.lastMeEnd) / 100);
+    const g = ctrl.seg, talking = ctrl.talking ? ctrl.talking() : !!(g && g.speaker === 'me');
+    const quiet = talking ? 0 : Math.max(0, ((ctrl.frameNow ? ctrl.frameNow() : listener.fs.nFrames) - ctrl.lastMeEnd) / 100);
     session.bestQuiet = Math.max(session.bestQuiet, quiet);
     $('quietLine').firstChild.textContent = talking ? 'Talking' : 'Quiet for '; $('quietFor').textContent = talking ? '' : clock(quiet);
     // talk freely: the countdown on the pill and the button
@@ -2357,9 +2665,10 @@ registerProcessor('samt-tap', SamtTap);
   async function stopSession(finished) {
     if (!session) return;
     if (ctrl && ctrl.seg) { try { ctrl.cut(); } catch (e) {} } // count the words still in progress
-    const snap = sessionSnap();
+    if (capture && capture.inSession) cancelMute(''); // the session's mic is about to stop
+    const snap = sessionSnap(), adaptQ = session.adaptQ.concat(ctrl && ctrl.adaptQueue ? ctrl.adaptQueue : []); // Sound level adds none
     clearInterval(session.timer); session = null;
-    if (ctrl) ctrl.stop();
+    if (ctrl) ctrl.stop(); gateTap = null; syncWho();
     releaseMic(); if (!showCtx) releaseWake();
     const c = ctrl ? ctrl.counts : { talk: 0 };
     $('remind').hidden = true; leaveSession();
@@ -2373,7 +2682,7 @@ registerProcessor('samt-tap', SamtTap);
       openEnd(history.find(r => r.id === snap.id) || snap, false);
     }
     // keep learning: speech that was confidently you, plus any That was me / Not me from this session
-    const q = ctrl ? ctrl.adaptQueue.slice() : [], fixes = pendingFixes.splice(0);
+    const q = adaptQ, fixes = pendingFixes.splice(0);
     if ((q.length || fixes.length) && voice) {
       setBusy('learning'); await tick();
       try {
@@ -2471,7 +2780,7 @@ registerProcessor('samt-tap', SamtTap);
     for (const r of list) {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'row';
       const t = document.createElement('span'); t.className = 'rt'; t.textContent = whenStr(r.at);
-      const s2 = document.createElement('span'); s2.className = 'r2'; s2.textContent = `${r.kind === 'conversation' ? 'Conversation' : 'Silence'} · ${minsText(r.dur)}${MOODS[r.mood] ? ' · ' + MOODS[r.mood] : ''}`; t.appendChild(s2);
+      const s2 = document.createElement('span'); s2.className = 'r2'; s2.textContent = `${r.kind === 'conversation' ? 'Conversation' : 'Silence'}${r.who === 'level' ? ' · Sound level' : ''} · ${minsText(r.dur)}${MOODS[r.mood] ? ' · ' + MOODS[r.mood] : ''}`; t.appendChild(s2);
       const v = document.createElement('span'); v.className = 'rv'; v.textContent = clock(r.talkTime) + ' talk';
       b.append(t, v, chevron()); b.onclick = () => openEnd(r, true); box.appendChild(b);
     }
@@ -2492,8 +2801,8 @@ registerProcessor('samt-tap', SamtTap);
     $('endTitle').textContent = review ? whenStr(rec.at) : 'Session done';
     const st = $('endStats'); st.textContent = '';
     const tot = (+rec.meSec || 0) + (+rec.otherSec || 0), you = tot >= 1 ? Math.round(100 * rec.meSec / tot) : null;
-    const rows = [['Kind', rec.kind === 'conversation' ? 'Conversation' : 'Silence'], ['Length', clock(rec.dur)], ['Talk time', clock(rec.talkTime)],
-      ['You and others', you == null ? 'No talking heard' : `You ${you}% · Others ${100 - you}%`], ['Longest quiet', clock(rec.bestQuiet)], ['Times echoed', String(rec.talks || 0)], ['Phrases passed', String(rec.phrases || 0)]];
+    const rows = [['Kind', rec.kind === 'conversation' ? 'Conversation' : 'Silence'], ['Echo by', rec.who === 'level' ? 'Sound level' : 'Your voice'], ['Length', clock(rec.dur)], ['Talk time', clock(rec.talkTime)],
+      ['You and others', you == null ? 'No talking heard' : `You ${you}% · Others ${100 - you}%`], ['Longest quiet', clock(rec.bestQuiet)], ['Times echoed', String(rec.talks || 0)]];
     if (rec.interrupts) rows.push(['Talked over someone', String(rec.interrupts)]);
     if (rec.kind === 'conversation') rows.push(['Nudges', String(rec.nudges || 0)]);
     if (rec.freePass) rows.push(['Talk freely taps', String(rec.freePass)]);
@@ -2502,7 +2811,7 @@ registerProcessor('samt-tap', SamtTap);
     showSummary(rec.summary);
     $('askClaude').disabled = false; $('askClaude').textContent = rec.summary ? 'Ask Claude again' : 'Ask Claude for a summary';
     $('claudeHint').textContent = CLAUDE_HINT; $('endDelete').hidden = !review;
-    $('endTip').hidden = !!review || !(rec.others > 0) || !!profile.othSegs.length || !!(voice && voice.N && voice.N.length);
+    $('endTip').hidden = !!review || rec.who === 'level' || !(rec.others > 0) || !!profile.othSegs.length || !!(voice && voice.N && voice.N.length);
     openSheet('end');
   }
   function showSummary(t) { $('endSummary').hidden = !t; $('endSummaryText').textContent = t || ''; }
@@ -2520,8 +2829,8 @@ registerProcessor('samt-tap', SamtTap);
     const m = dayTotals(), now = new Date(), week = [];
     for (let i = 6; i >= 0; i--) { const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i), x = m.get(dayKey(d)) || { talk: 0, n: 0 }; week.push({ day: d.toLocaleDateString('en-US', { weekday: 'short' }), talkMin: +(x.talk / 60).toFixed(1), sessions: x.n }); }
     const tot = (+r.meSec || 0) + (+r.otherSec || 0);
-    const body = { session: { kind: r.kind, minutes: +(r.dur / 60).toFixed(1), talkMin: +((+r.talkTime || 0) / 60).toFixed(1), youPercent: tot >= 1 ? Math.round(100 * r.meSec / tot) : null,
-      longestQuietMin: +((+r.bestQuiet || 0) / 60).toFixed(1), echoes: r.talks || 0, phrasesPassed: r.phrases || 0, talkedOverSomeone: r.interrupts || 0, nudges: r.nudges || 0, talkFreelyTaps: r.freePass || 0,
+    const body = { session: { kind: r.kind, echoBy: r.who === 'level' ? 'sound level' : 'voice', minutes: +(r.dur / 60).toFixed(1), talkMin: +((+r.talkTime || 0) / 60).toFixed(1), youPercent: tot >= 1 ? Math.round(100 * r.meSec / tot) : null,
+      longestQuietMin: +((+r.bestQuiet || 0) / 60).toFixed(1), echoes: r.talks || 0, talkedOverSomeone: r.interrupts || 0, nudges: r.nudges || 0, talkFreelyTaps: r.freePass || 0,
       mood: r.mood || null, note: r.note || '' }, dailyBudgetMin: shared.budget, last7Days: week, daysWithinBudget: streakDays(m) };
     const btn = $('askClaude'); btn.disabled = true; btn.textContent = 'Asking Claude…'; $('claudeHint').textContent = CLAUDE_HINT;
     try {
@@ -2638,7 +2947,7 @@ registerProcessor('samt-tap', SamtTap);
   }
 
   /* ---------- views: Home, the session, and the pages under Home (Back, and the iPad's back gesture) ---------- */
-  const VIEWS = { home: 'vHome', session: 'vSession', progress: 'vProgress', settings: 'vSettings', phrases: 'vPhrases', wizard: 'vWizard' };
+  const VIEWS = { home: 'vHome', session: 'vSession', progress: 'vProgress', settings: 'vSettings', wizard: 'vWizard' };
   let view = 'home';
   function goView(v, how) {
     if (!VIEWS[v]) v = 'home';
@@ -2658,7 +2967,7 @@ registerProcessor('samt-tap', SamtTap);
   function goBack() {
     const st = window.history.state;
     if (st && st.samt && st.samt !== 'home' && window.history.length > 1) window.history.back();
-    else goView(view === 'phrases' || (view === 'wizard' && wizFrom === 'settings') ? 'settings' : 'home', 'replace');
+    else goView(view === 'wizard' && wizFrom === 'settings' ? 'settings' : 'home', 'replace');
   }
   function enterSession() {
     document.body.classList.add('in-session');
@@ -2667,7 +2976,7 @@ registerProcessor('samt-tap', SamtTap);
   }
   function leaveSession() {
     document.body.classList.remove('in-session');
-    if (openSheets.includes('details')) closeSheet('details');
+    for (const s of ['mute', 'details']) if (openSheets.includes(s)) closeSheet(s);
     const ours = window.history.state && window.history.state.samt === 'session';
     goView('home', 'none');
     if (ours) try { window.history.back(); } catch (e) {} // drop the session's entry; the popstate lands on Home again
@@ -2675,17 +2984,9 @@ registerProcessor('samt-tap', SamtTap);
   const LEVEL = { '-1': 'Looser', 0: 'Balanced', 1: 'Stricter' };
   function settingsValues() {
     $('echoStatus').textContent = `${settings.delay} ms · ${settings.vol}%`;
-    $('matchStatus').textContent = settings.strict === settings.psens ? LEVEL[settings.strict] : `${LEVEL[settings.strict]}, phrases ${LEVEL[settings.psens].toLowerCase()}`;
+    $('matchStatus').textContent = LEVEL[settings.strict];
   }
   const convText = () => `${settings.limit} s turns · ${settings.noInterrupt ? 'no interrupting' : 'interrupting allowed'} · ${settings.nudge ? 'nudge first' : 'no nudge'}`;
-  /* The first time Conversation is picked, offer the phrases (once). */
-  function maybeOfferPhrases() {
-    const key = 'samt.' + MODE + '.phraseOffer';
-    try { if (localStorage.getItem(key)) return; localStorage.setItem(key, '1'); } catch (e) { return; }
-    if (!voice || !voice.ready || book.phrases.some(p => p.takes.length >= 2)) return;
-    ask({ title: 'Let greetings pass?', msg: 'Say salam, thanks and short answers 3 times each, about 2 minutes, and Samt lets them through with no echo.',
-      actions: [{ label: 'Record the phrases', run: () => recordPhrases(book.phrases.filter(p => p.takes.length < 2).map(p => p.id)) }, { label: 'Not now', run: () => {} }] });
-  }
   /* Ending a real session takes a 2-second hold while a ring fills, so it can't happen by accident or on impulse. A test stops with a tap. */
   function wireHoldStop() {
     const b = $('stop'); let t = 0;
@@ -2721,9 +3022,9 @@ registerProcessor('samt-tap', SamtTap);
     const started = ensureMic(); // inside the tap
     $('testStart').hidden = true; $('testHint').textContent = 'Starting the mic'; setBusy('echotest');
     started.then(() => {
-      listener.reset(); voice.strict = strictValue(); book.sens = phraseSens();
+      listener.reset(); voice.strict = strictValue();
       const t = { me: 0, speech: 0, echo: false, start: listener.fs.nFrames };
-      t.ctrl = new Controller({ listener, voice, book, onEcho: setEcho, onEvent: e => {
+      t.ctrl = new Controller({ listener, voice, book: null, onEcho: setEcho, onEvent: e => {
         if (e.type === 'segment') { t.speech++; if (e.rec.speaker === 'me') t.me++; }
         else if (e.type === 'verdict' && e.isMe) t.me++;
         else if (e.type === 'state' && e.state === 'echo') t.echo = true;
@@ -2764,11 +3065,12 @@ registerProcessor('samt-tap', SamtTap);
   const CHECK_SEC = 20, CHECK_MIN = 10;
   let check = null;
   function startCheck() {
-    if (busy || !voice || !voice.ready) return;
-    if (MODE === 'neural' && !ortSession) { note('The voice model is still loading.'); return; }
+    const lv = settings.who === 'level';
+    if (busy || (!lv && (!voice || !voice.ready))) return;
+    if (!lv && MODE === 'neural' && !ortSession) { note('The voice model is still loading.'); return; }
     const started = ensureMic(); // first, inside the tap
     note(''); setBusy('check');
-    check = { round: 0, waiting: false, tally: [{ n: 0, ok: 0 }, { n: 0, ok: 0 }] }; debug.checkLog = [];
+    check = { who: settings.who, round: 0, waiting: false, tally: [{ n: 0, ok: 0 }, { n: 0, ok: 0 }], lv: [null, null] }; debug.checkLog = [];
     openPanel({ title: 'Round 1 of 2: you talk', passage: 'Talk about anything in your normal voice, like what you did today. Only you, about 20 seconds.', hint: 'Starting the mic' });
     rec = { kind: 'check', finish: cancel => cancel ? endCheck(true) : check && check.waiting ? beginRound(1) : endRound() };
     started.then(() => { if (rec && rec.kind === 'check') beginRound(0); }, e => { rec = null; check = null; closePanel(); setBusy(null); note(micError(e)); });
@@ -2776,13 +3078,17 @@ registerProcessor('samt-tap', SamtTap);
   function beginRound(i) {
     const k = check; if (!k) return;
     k.round = i; k.waiting = false; k.speech = 0; k.seen = new Set();
-    listener.reset(); voice.strict = strictValue(); book.sens = phraseSens();
-    // Silence's rules (the echo as soon as it's you), in test mode: the verdicts happen, the echo doesn't play
-    const c = new Controller({ listener, voice, book, onEcho: () => {}, params: { limit: 0, interrupt: false, nudge: false }, onEvent: e => {
+    listener.reset();
+    // Silence's rules (the echo as soon as it's you, or as soon as it's over the line), in test mode: the decisions
+    // happen, the echo doesn't play
+    const params = { limit: 0, interrupt: false, nudge: false }, onEvent = e => {
       if (k.ctrl !== c) return;
       if (e.type === 'state' && e.state === 'echo' && c.seg) k.seen.add(c.seg.id);
       else if (e.type === 'segment') tallySeg(k, e.rec);
-    } });
+    };
+    let c;
+    if (k.who === 'level') { c = new LevelGate({ listener, onEcho: () => {}, onEvent, params: Object.assign({ line: lineNow(), hold: holdFrames() }, params) }); c.setNotches(allTones()); c.collect = []; gateTap = c; }
+    else { voice.strict = strictValue(); c = new Controller({ listener, voice, book: null, onEcho: () => {}, onEvent, params }); }
     k.ctrl = c; c.start('test');
     $('recDone').textContent = 'Done'; $('recDone').disabled = true; $('recProg').style.transform = 'scaleX(0)';
     k.timer = setInterval(() => roundTick(k), 200); roundTick(k);
@@ -2795,7 +3101,8 @@ registerProcessor('samt-tap', SamtTap);
   }
   function roundTick(k) {
     if (check !== k || k.waiting || !k.ctrl) return;
-    const g = k.ctrl.seg, sec = k.speech + (g ? Math.max(0, g.next - g.start) / 100 : 0), t = k.tally[k.round];
+    const c = k.ctrl, g = c.seg, now = c.frameNow ? c.frameNow() : g && g.next; // the stretch still going counts too
+    const sec = k.speech + (g ? Math.max(0, now - g.start) / 100 : 0), t = k.tally[k.round];
     $('recProg').style.transform = `scaleX(${Math.min(1, sec / CHECK_SEC).toFixed(3)})`;
     $('recHint').textContent = `Listening. ${Math.floor(sec)} of ${CHECK_SEC} seconds` +
       (t.n ? (k.round === 0 ? `. Caught you ${t.ok} of ${t.n} so far.` : `. Ignored them ${t.ok} of ${t.n} so far.`) : '.');
@@ -2806,7 +3113,9 @@ registerProcessor('samt-tap', SamtTap);
     const k = check; if (!k || k.waiting || !k.ctrl) return;
     clearInterval(k.timer);
     try { if (k.ctrl.seg) k.ctrl.cut(); } catch (e) {} // count the stretch still going
-    k.ctrl.stop(); k.ctrl = null;
+    // Sound level: how loud each round's talking was (your typical level, their loudest moments), to place the line
+    const lv = k.ctrl.collect; if (lv && lv.length >= 30) k.lv[k.round] = st.pct(lv, k.round === 0 ? 0.5 : 0.95);
+    k.ctrl.stop(); k.ctrl = null; if (gateTap && !session) gateTap = null;
     if (k.round === 1) { endCheck(false); return; }
     k.waiting = true; // between the rounds: time to hand over, or start a video
     $('recTitle').textContent = 'Round 2 of 2: someone else talks';
@@ -2818,18 +3127,34 @@ registerProcessor('samt-tap', SamtTap);
   function endCheck(cancel) {
     const k = check; if (!k) return; check = null;
     clearInterval(k.timer); if (k.ctrl) { try { k.ctrl.stop(); } catch (e) {} }
+    if (gateTap && !session) gateTap = null;
     rec = null; closePanel(); releaseMic();
-    if (!cancel) { wiz.check = { you: [k.tally[0].ok, k.tally[0].n], oth: [k.tally[1].ok, k.tally[1].n], strict: settings.strict, at: Date.now() }; delete wiz.skip.check; saveWiz(); }
+    if (!cancel) {
+      wiz.check = { who: k.who, you: [k.tally[0].ok, k.tally[0].n], oth: [k.tally[1].ok, k.tally[1].n], strict: settings.strict, line: lineNow(), at: Date.now() };
+      if (k.who === 'level' && k.lv[0] != null && k.lv[1] != null) wiz.check.lv = { you: Math.round(k.lv[0] * 10) / 10, oth: Math.round(k.lv[1] * 10) / 10 };
+      delete wiz.skip.check; saveWiz();
+    }
     setBusy(null);
   }
   /* What the numbers mean, and the one thing most likely to help. */
   function checkAdvice(c) {
-    const again = { label: 'Check again', run: startCheck }, next = { label: 'Next', run: () => wizGo(wizAt + 1) };
-    if (c.stale || c.strict !== settings.strict) return { status: 'Samt has changed since this check: it learned more, or Matching changed. Check again to see where it stands.', main: again, next: true };
+    const again = { label: 'Check again', run: startCheck }, next = { label: 'Next', run: () => wizGo(wizAt + 1) }, who = c.who || 'voice';
+    const NAME = { voice: 'Your voice', level: 'Sound level' };
+    if (who !== settings.who) return { status: `This check was of ${NAME[who]}. Check again to see how ${NAME[settings.who]} does.`, main: again, next: true };
+    if (c.stale || (who === 'level' ? c.line !== lineNow() : c.strict !== settings.strict))
+      return { status: who === 'level' ? 'The line or the muted sounds changed since this check. Check again to see where it stands.' : 'Samt has changed since this check: it learned more, or Matching changed. Check again to see where it stands.', main: again, next: true };
     const [yo, yn] = c.you, [oo, on] = c.oth;
     if (yn < 3 || on < 2) return { status: yn < 3 ? 'Not enough of your talking to judge. Talk a little longer next time.' : 'Not enough of the other voice to judge. Let them talk a little longer next time.', main: again, next: true };
     const youOk = yo / yn >= 0.8, othOk = oo / on >= 0.9, tip = MODE === 'light' ? ' Samt Neural tells voices apart better.' : '';
-    if (youOk && othOk) return { status: 'Samt can tell you apart.', good: true, main: next, alt: again };
+    if (youOk && othOk) return { status: who === 'level' ? 'Your voice goes over the line and theirs stays under.' : 'Samt can tell you apart.', good: true, main: next, alt: again };
+    if (who === 'level') { // a line halfway between your typical level and their loudest, if they're 4 dB or more apart
+      const L = c.lv, mid = L && L.you - L.oth >= 4 ? clampLine(2 * Math.round((L.you + L.oth) / 4)) : null;
+      if (mid != null && mid !== lineNow()) return { status: youOk ? 'Their voices went over the line sometimes. Yours is louder, so a line between you should work.' : "Your voice stayed under the line sometimes. It's louder than theirs, so a line between you should work.",
+        main: { label: 'Put the line between you and check again', run: () => { setLine(mid); startCheck(); } }, alt: again, next: true };
+      if (youOk || othOk) return { status: "Their voices reach the mic almost as loud as yours. Wear the mic closer to your mouth, or move a little away from them." + (youOk ? ' Or raise the line.' : ' Or lower the line.'),
+        main: { label: youOk ? 'Raise the line and check again' : 'Lower the line and check again', run: () => { setLine(lineNow() + (youOk ? 2 : -2)); startCheck(); } }, alt: again, next: true };
+      return { status: "Their voices reach the mic about as loud as yours, so a line can't split them. Wear the mic closer to your mouth, or move away from them.", main: again, next: true };
+    }
     if (youOk) return settings.strict < 1
       ? { status: 'It took them for you sometimes. Stricter matching should help.', main: { label: 'Make it stricter and check again', run: () => setStrict(settings.strict + 1) }, alt: again, next: true }
       : { status: 'It still took them for you sometimes. More of other voices should help.' + tip, main: { label: 'Add other voices', run: () => teachVoice('oth') }, alt: again, next: true };
@@ -2849,8 +3174,7 @@ registerProcessor('samt-tap', SamtTap);
     { id: 'voice', title: 'Your voice' },
     { id: 'echo', title: 'Hear the echo', skip: true },
     { id: 'others', title: 'Other voices', skip: true },
-    { id: 'check', title: 'Check it', skip: true },
-    { id: 'phrases', title: 'Phrases that pass', skip: true, optional: true }
+    { id: 'check', title: 'Check it', skip: true }
   ];
   const WKEY = 'samt.' + MODE + '.setup';
   const freshWiz = () => ({ skip: {}, echoOk: false, check: null, done: false });
@@ -2859,9 +3183,8 @@ registerProcessor('samt-tap', SamtTap);
   function saveWiz() { try { localStorage.setItem(WKEY, JSON.stringify(wiz)); } catch (e) {} }
   let wizAt = 0, wizFrom = 'home', wizMain = null, wizAlt = null;
   const othersTaught = () => profile.othSegs.length > 0 || !!(MODE === 'neural' && voice && voice.N && voice.N.length);
-  const phrasesReady = () => book.phrases.filter(p => p.takes.length >= 2).length;
   function stepState(id) {
-    const done = id === 'voice' ? !!(voice && voice.ready) : id === 'echo' ? !!wiz.echoOk : id === 'others' ? othersTaught() : id === 'check' ? !!wiz.check : phrasesReady() > 0;
+    const done = id === 'voice' ? !!(voice && voice.ready) : id === 'echo' ? !!wiz.echoOk : id === 'others' ? othersTaught() : !!wiz.check;
     return done ? 'done' : wiz.skip[id] ? 'skipped' : 'todo';
   }
   const wizSettled = () => WSTEPS.every(s => stepState(s.id) !== 'todo');
@@ -2903,15 +3226,12 @@ registerProcessor('samt-tap', SamtTap);
       v.body = "Let someone else talk near you for about 30 seconds while you stay quiet: a person, or a TV or another phone playing a video. Men's voices are the hardest test, so use one if you can.";
       if (st === 'done') { const s = secs(profile.othSegs); v.status = s ? `Done. Samt knows ${s} seconds of other voices.` : 'Done.'; v.main = next; v.alt = { label: 'Add more', run: () => teachVoice('oth') }; }
       else todo({ label: 'Start', run: () => teachVoice('oth'), off: !modelOk });
-    } else if (id === 'check') {
-      v.body = 'Two rounds of about 20 seconds: first you talk, then someone else talks while you stay quiet. No echo plays. Samt counts how often it got each right.';
-      if (st === 'done') { v.res = wiz.check; Object.assign(v, checkAdvice(wiz.check)); }
-      else todo({ label: 'Start the check', run: startCheck, off: !modelOk });
     } else {
-      v.body = 'Say each greeting, thanks and short answer 3 times, about 2 minutes. Samt then lets them through with no echo.';
-      const missing = book.phrases.filter(p => p.takes.length < 2).map(p => p.id);
-      if (st === 'done') { v.status = `Done. ${phrasesReady()} of ${book.phrases.length} phrases recorded.`; v.main = next; if (missing.length) v.alt = { label: 'Record the missing ones', run: () => recordPhrases(missing) }; }
-      else todo({ label: 'Record the phrases', run: () => recordPhrases(missing.length ? missing : book.phrases.map(p => p.id)) });
+      const lv = settings.who === 'level';
+      v.body = 'Two rounds of about 20 seconds: first you talk, then someone else talks while you stay quiet. No echo plays. '
+        + (lv ? 'Samt counts how often your voice went over the line and theirs stayed under (Sound level).' : 'Samt counts how often it got each right (Your voice).');
+      if (st === 'done') { v.res = wiz.check; Object.assign(v, checkAdvice(wiz.check)); }
+      else todo({ label: 'Start the check', run: startCheck, off: !lv && !modelOk });
     }
     return v;
   }
@@ -2920,7 +3240,6 @@ registerProcessor('samt-tap', SamtTap);
     if (id === 'voice') return `${Math.round(frames(profile.meSegs) / 100)} s`;
     if (id === 'others') { const s = Math.round(frames(profile.othSegs) / 100); return s ? `${s} s` : 'Done'; }
     if (id === 'check') { const c = wiz.check; return `You ${c.you[0]}/${c.you[1]} · Others ${c.oth[0]}/${c.oth[1]}`; }
-    if (id === 'phrases') return `${phrasesReady()} of ${book.phrases.length}`;
     return 'Done';
   }
   function renderWizard() {
@@ -2965,56 +3284,29 @@ registerProcessor('samt-tap', SamtTap);
     const othN = MODE === 'neural' && voice && voice.N ? voice.N.length : 0;
     $('othStatus').textContent = profile.othSegs.length ? `${Math.round(frames(profile.othSegs) / 100)} s` : othN ? 'Taught' : 'Recommended';
     if (MODE === 'neural') { $('modelRow').hidden = false; if (ortSession) $('modelStatus').textContent = `Ready, ${Math.round(modelMs)} ms a check`; }
-    const ready = book.phrases.filter(p => p.takes.length >= 2).length;
-    $('phrStatus').textContent = `${ready} of ${book.phrases.length} recorded.`;
     $('teachVoice').disabled = !idle || !modelOk; $('teachOthers').disabled = !idle || !taught || !modelOk;
-    $('recordAll').disabled = !idle; $('resetAll').disabled = !idle; $('restoreBtn').disabled = !idle; $('backupBtn').disabled = !idle || !taught;
+    $('resetAll').disabled = !idle; $('restoreBtn').disabled = !idle; $('backupBtn').disabled = !idle || !taught;
     const paused = !!(session && session.paused), test = !!(session && session.mode === 'test');
-    // Home: teach your voice first, or start a session
+    // Home: teach your voice first, or start a session (Sound level doesn't wait for the voice model)
     $('setupCard').hidden = taught; $('readyCard').hidden = !taught;
     $('setupStart').disabled = !idle; // the first step waits for the voice model itself
     $('setupModel').hidden = modelOk; if (!modelOk) $('setupModel').textContent = 'Getting the voice model ready: ' + $('modelStatus').textContent.toLowerCase();
-    $('go').disabled = $('test').disabled = !idle || !taught || !modelOk;
+    $('go').disabled = $('test').disabled = !idle || !taught || (settings.who === 'voice' && !modelOk);
     $('go').textContent = settings.kind === 'conversation' ? 'Start conversation' : 'Start silence';
     $('kindSeg').querySelectorAll('button').forEach(b => { b.disabled = !idle; });
+    $('whoSeg').querySelectorAll('button').forEach((b, i) => { b.disabled = !idle || (i === 0 && !voiceUsable()); });
     settingsValues();
     $('convLine').hidden = settings.kind !== 'conversation'; $('convLine').textContent = convText(); $('convStatus').textContent = `${settings.limit} s turns`;
     $('toProgress').hidden = !history.length;
-    $('phrCount').textContent = `${book.phrases.filter(p => p.takes.length >= 2).length} of ${book.phrases.length}`;
     $('endTeachOthers').disabled = !idle;
+    $('muteStatus').textContent = shared.mutes.length ? String(shared.mutes.length) : 'None';
     // the session view
     $('resume').hidden = !paused; $('pass').hidden = paused || test;
     $('stopText').textContent = test ? 'Stop test' : 'Hold to stop'; $('stop').classList.toggle('hold', !test); $('stop').querySelector('.ring').style.display = test ? 'none' : '';
-    renderPhrases();
+    $('sWhoSeg').querySelectorAll('button').forEach((b, i) => { b.disabled = paused || (i === 0 && !voiceUsable()); });
     // setup, step by step
     $('wizStatus').textContent = wizStatusText(); $('toWizard').disabled = !idle;
     renderWizard();
-  }
-  function renderPhrases() {
-    const box = $('phraseList'), groups = [];
-    for (const p of book.phrases) { let g = groups.find(x => x.name === p.group); if (!g) groups.push(g = { name: p.group, items: [] }); g.items.push(p); }
-    box.textContent = '';
-    groups.forEach((g, gi) => {
-      const cap = document.createElement('h3'); cap.className = 'cap'; cap.textContent = g.name; if (gi === 0) cap.hidden = true;
-      const grp = document.createElement('div'); grp.className = 'group';
-      for (const p of g.items) {
-        const b = document.createElement('button'); b.type = 'button'; b.className = 'row'; b.disabled = !!busy;
-        const lab = document.createElement('span'); lab.className = 'rt' + (p.rtl ? ' ar' : ''); lab.textContent = p.label; if (p.rtl) { lab.lang = 'ar'; lab.dir = 'rtl'; lab.style.textAlign = 'left'; }
-        const val = document.createElement('span'); val.className = 'rv'; val.textContent = p.takes.length >= 2 ? `${p.takes.length} takes` : p.takes.length ? '1 take' : 'Not recorded';
-        const chev = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); chev.setAttribute('class', 'ic chev'); const use = document.createElementNS('http://www.w3.org/2000/svg', 'use'); use.setAttribute('href', '#i-chev'); chev.appendChild(use);
-        b.append(lab, val, chev);
-        b.onclick = () => {
-          if (!p.takes.length && !p.custom) { recordPhrases([p.id]); return; }
-          const actions = [{ label: p.takes.length ? 'Record again' : 'Record', run: () => recordPhrases([p.id]) }];
-          if (p.takes.length) actions.push({ label: 'Clear the takes', danger: true, run: async () => { p.takes = []; p.thr = null; await saveAll(); render(); } });
-          if (p.custom) actions.push({ label: 'Delete this phrase', danger: true, run: async () => { book.remove(p.id); await saveAll(); render(); } });
-          ask({ title: p.label, actions });
-        };
-        grp.appendChild(b);
-      }
-      if (gi > 0) box.appendChild(cap);
-      box.appendChild(grp);
-    });
   }
 
   /* ---------- wiring ---------- */
@@ -3044,7 +3336,10 @@ registerProcessor('samt-tap', SamtTap);
     // pages, sheets and the session's own tools
     $('toProgress').onclick = () => goView('progress', 'push');
     $('toSettings').onclick = () => goView('settings', 'push');
-    $('toPhrases').onclick = () => goView('phrases', 'push');
+    $('toMute').onclick = $('dMute').onclick = openMutes;
+    $('muteClose').onclick = () => closers.mute();
+    $('muteGo').onclick = muteSound;
+    $('lineDown').onclick = () => setLine(lineNow() - 2); $('lineUp').onclick = () => setLine(lineNow() + 2);
     document.addEventListener('click', e => { if (e.target.closest('[data-back]')) { e.preventDefault(); goBack(); } });
     $('readout').onclick = () => openSheet('timer');
     $('timerClose').onclick = $('timerDone').onclick = () => closeSheet('timer');
@@ -3061,10 +3356,8 @@ registerProcessor('samt-tap', SamtTap);
     $('testMore').onclick = () => { closeSheet('test'); wantEchoTest = true; teachVoice('me'); };
     $('endTeachOthers').onclick = () => { closeEnd(); teachVoice('oth'); };
     $('teachOthers').onclick = () => teachVoice('oth');
-    $('recordAll').onclick = () => { const ids = book.phrases.filter(p => p.takes.length < 2).map(p => p.id); recordPhrases(ids.length ? ids : book.phrases.map(p => p.id)); };
     $('recDone').onclick = () => rec && rec.finish(false);
     $('recCancel').onclick = () => rec && rec.finish(true);
-    $('recSkip').onclick = () => rec && rec.skip && rec.skip();
     $('wasMe').onclick = () => correct(true); $('notMe').onclick = () => correct(false);
     $('actCancel').onclick = closeAsk; $('actScrim').onclick = closeAsk;
     document.addEventListener('keydown', e => {
@@ -3076,7 +3369,10 @@ registerProcessor('samt-tap', SamtTap);
       else if (rec) rec.finish(true);
     });
     // the kind of session, talking freely, and the conversation rules
-    seg($('kindSeg'), [{ v: 'silence', label: 'Silence' }, { v: 'conversation', label: 'Conversation' }], settings.kind, v => { settings.kind = v; saveSettings(); render(); renderCounts(); if (v === 'conversation') maybeOfferPhrases(); });
+    seg($('kindSeg'), [{ v: 'silence', label: 'Silence' }, { v: 'conversation', label: 'Conversation' }], settings.kind, v => { settings.kind = v; saveSettings(); render(); renderCounts(); });
+    // what turns the echo on: Your voice (the voice check) or Sound level (the line); on Home, and mid-session
+    const WHO = [{ v: 'voice', label: 'Your voice' }, { v: 'level', label: 'Sound level' }];
+    whoCtl = seg($('whoSeg'), WHO, settings.who, setWho); sWhoCtl = seg($('sWhoSeg'), WHO, settings.who, setWho);
     $('pass').onclick = () => { if (!ctrl || !session || session.mode === 'test' || session.paused) return; ctrl.pass(Math.min(60, ctrl.passLeft() + 10)); tickSession(); };
     const applyConv = () => { if (ctrl && session && session.kind === 'conversation') Object.assign(ctrl.p, convParams()); render(); };
     const sw = (id, key) => { const el = $(id), sync = () => el.setAttribute('aria-checked', String(!!settings[key])); el.onclick = () => { settings[key] = !settings[key]; saveSettings(); sync(); applyConv(); }; sync(); };
@@ -3115,7 +3411,6 @@ registerProcessor('samt-tap', SamtTap);
     // a line of text
     $('txtSave').onclick = () => endText(true); $('txtClose').onclick = () => endText(false);
     $('txtForm').addEventListener('submit', e => { e.preventDefault(); endText(true); });
-    $('addPhrase').addEventListener('submit', async e => { e.preventDefault(); const v = $('newPhrase').value.trim(); if (!v) return; book.add(v.slice(0, 60)); $('newPhrase').value = ''; await saveAll(); render(); });
     const presets = seg($('presets'), [{ v: 15, label: '15 min' }, { v: 30, label: '30 min' }, { v: 60, label: '1 hr' }, { v: 120, label: '2 hr' }, { v: 240, label: '4 hr' }], settings.mins, v => { settings.mins = v; $('until').value = ''; saveSettings(); syncTimer(); });
     const syncTimer = () => { $('minsOut').textContent = settings.mins; presets.set($('until').value ? null : settings.mins); $('clearUntil').hidden = !$('until').value; refreshReadout(); };
     const stepMins = d => { settings.mins = Math.max(5, Math.min(720, settings.mins + d)); $('until').value = ''; saveSettings(); syncTimer(); };
@@ -3127,23 +3422,22 @@ registerProcessor('samt-tap', SamtTap);
       $(up).onclick = () => { settings[key] = Math.min(hi, settings[key] + step); saveSettings(); show(); apply(); };
       show();
     };
-    stepper('delay', 'delayDown', 'delayUp', 'delayOut', 20, 60, 400, v => v + ' ms', () => { mic.setDelay(settings.delay / 1000); settingsValues(); });
+    stepper('delay', 'delayDown', 'delayUp', 'delayOut', 20, 60, 400, v => v + ' ms', () => { mic.setDelay(settings.delay / 1000); if (gateTap) gateTap.p.hold = holdFrames(); settingsValues(); });
     const volApply = () => { mic.setVolume(settings.vol / 100); $('volOut').textContent = $('dVolOut').textContent = settings.vol + '%'; settingsValues(); };
     stepper('vol', 'volDown', 'volUp', 'volOut', 10, 10, 100, v => v + '%', volApply);
     stepper('vol', 'dVolDown', 'dVolUp', 'dVolOut', 10, 10, 100, v => v + '%', volApply); // the same volume, inside a session
     stepper('limit', 'limitDown', 'limitUp', 'limitOut', 5, 5, 60, v => v + ' s', () => { if (ctrl && session && session.kind === 'conversation') Object.assign(ctrl.p, convParams()); render(); });
     const LSB = [{ v: -1, label: 'Looser' }, { v: 0, label: 'Balanced' }, { v: 1, label: 'Stricter' }];
     strictCtl = seg($('strictSeg'), LSB, settings.strict, v => { settings.strict = v; saveSettings(); if (voice) voice.strict = strictValue(); settingsValues(); renderWizard(); });
-    seg($('psensSeg'), LSB, settings.psens, v => { settings.psens = v; saveSettings(); book.sens = phraseSens(); settingsValues(); });
     seg($('themeSeg'), [{ v: 'auto', label: 'Auto' }, { v: 'day', label: 'Day' }, { v: 'night', label: 'Night' }], themePref(), v => { try { localStorage.setItem('samt.theme', v); } catch (e) {} applyTheme(); });
     $('backupBtn').onclick = backup;
     $('restoreBtn').onclick = () => $('restoreFile').click();
     $('restoreFile').onchange = () => { const f = $('restoreFile').files[0]; $('restoreFile').value = ''; if (f) restore(f); };
     $('resetAll').onclick = () => ask({
-      title: "Erase Samt's setup?", msg: 'Your voice, the other voices and your phrases on this device will be deleted. A backup file is not affected.',
+      title: "Erase Samt's setup?", msg: 'Your voice and the other voices on this device will be deleted. A backup file is not affected.',
       actions: [{ label: 'Erase everything', danger: true, run: async () => {
-        await Promise.all(['profile', 'voice', 'phrases'].map(k => store.del(K(k))));
-        profile = { meSegs: [], othSegs: [], adaptSegs: [] }; voice = null; book = new PhraseBook(); lastRec = null;
+        await Promise.all(['profile', 'voice', 'phrases'].map(k => store.del(K(k)))); // 'phrases': left by older versions
+        profile = { meSegs: [], othSegs: [], adaptSegs: [] }; voice = null; lastRec = null;
         wiz = freshWiz(); saveWiz(); // setup starts again from step 1
         renderLast(); live('off', 'Teach Samt your voice to begin'); render(); toast('Erased on this device.');
       } }]
@@ -3156,7 +3450,7 @@ registerProcessor('samt-tap', SamtTap);
     if (MODE === 'neural') { $('modelRow').hidden = false; loadModel().catch(() => {}); }
     await loadAll();
     if (!(await store.available())) $('storeWarn').hidden = false;
-    live('off', 'Ready'); render(); renderCounts();
+    syncWho(); renderLine(); live('off', 'Ready'); render(); renderCounts();
     try { window.history.replaceState({ samt: 'home' }, ''); } catch (e) {}
     goView('home', 'none');
     try { await loadHistory(); } catch (e) {}
@@ -3166,7 +3460,8 @@ registerProcessor('samt-tap', SamtTap);
     // fetch the Amiri fonts once the page has settled, so a session's first reminder doesn't flash in another font
     setTimeout(() => { try { for (const f of ['"Amiri Quran"', 'Amiri', '"Samt Arabic"']) document.fonts.load('26px ' + f, 'ق').catch(() => {}); } catch (e) {} }, 2000);
     debug.history = () => history; debug.shared = shared; debug.view = () => view; debug.trouble = onTrouble;
-    debug.wiz = () => ({ at: wizAt, states: WSTEPS.map(s => stepState(s.id)), check: wiz.check, done: wiz.done, strict: settings.strict });
+    debug.wiz = () => ({ at: wizAt, states: WSTEPS.map(s => stepState(s.id)), check: wiz.check, done: wiz.done, strict: settings.strict, who: settings.who });
+    debug.line = () => lineNow(); debug.setLine = setLine; debug.mutes = () => shared.mutes; debug.gate = () => gateTap;
     if (FAKE) { debug.feed = async (name, url) => { const b = await (await fetch(url)).arrayBuffer(); return mic.play(name, new Float32Array(b)); }; debug.ensureEngine = ensureMic; }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
