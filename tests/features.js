@@ -1,7 +1,7 @@
 // Run from the repo root after tests/setup-flow.js has run for the same engine and version (it restores that run's
 // backup from tests/out/): node tests/features.js [webkit|chromium] [light|neural]. Ends ALL PASS or N FAILED.
 // The features in a real engine with the fake mic, on the stage-based layout: Home (conversation options, quick tools),
-// the session view (talk freely, Details, a short tap on Stop, hold to stop, Back can't leave), the end sheet with a
+// the session view (talk freely and its limit, Details, a short tap on the main button, hold to pause, Resume, End session, Back can't leave), the end sheet with a
 // (mocked) Claude summary, Progress (today, budget, the week, past sessions), Settings (backup), layout at 390 and 1024.
 const pw = (() => { try { return require('playwright-core'); } catch (e) { return require('/opt/node-tools/node_modules/playwright-core'); } })(); const { spawn } = require('child_process'); const fs = require('fs'), path = require('path');
 const [engine = 'webkit', mode = 'light', speed = '10'] = process.argv.slice(2);
@@ -30,6 +30,7 @@ let fails = 0; const ok = (c, s) => { console.log(`[${engine} ${mode}] ${c ? 'PA
   const hold = async sel => { const b = await page.locator(sel).boundingBox(); await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2); await page.mouse.down(); await sleep(2200); await page.mouse.up(); };
   const smallText = () => page.evaluate(() => [...document.querySelectorAll('body *')].filter(e => e.offsetParent && e.childNodes.length && [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(e).fontSize) < 16).map(e => e.tagName + '.' + e.className + ':' + getComputedStyle(e).fontSize).slice(0, 8));
   const overflow = () => page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+  const toSec = t => t.split(':').reduce((a, x) => a * 60 + +x, 0);
   try {
     await page.goto(`http://127.0.0.1:${PORT}/site/${mode}/?fakemic=1&speed=${speed}`);
     if (mode === 'neural') await page.waitForFunction(() => document.querySelector('#modelStatus').textContent.startsWith('Ready'), null, { timeout: 180000 });
@@ -39,6 +40,9 @@ let fails = 0; const ok = (c, s) => { console.log(`[${engine} ${mode}] ${c ? 'PA
     await page.setInputFiles('#restoreFile', path.join(OUT, `backup_${engine}_${mode}.json`));
     await page.waitForFunction(() => document.querySelector('#toast').textContent.includes('restored'), null, { timeout: 30000 });
     ok(await page.isVisible('#readyCard') && await page.isHidden('#setupCard'), 'setup restored from backup: Home shows the start card');
+    // no double-tap zoom: every element is touch-action manipulation, except hold-to-stop (none, for the hold)
+    const ta = await page.evaluate(() => { const odd = [...document.querySelectorAll('body *')].filter(e => getComputedStyle(e).touchAction !== 'manipulation').map(e => e.id || e.className); return { odd, stop: getComputedStyle(document.querySelector('#stop')).touchAction }; });
+    ok(ta.odd.length === 1 && ta.odd[0] === 'stop' && ta.stop === 'none', 'no double-tap zoom: every element manipulation, Stop none (' + JSON.stringify(ta.odd) + ')');
     const h0 = (await page.evaluate(() => SamtDebug.history())).length; // a restored backup may bring past sessions
     if (!h0) ok(await page.isHidden('#toProgress'), 'no sessions yet: no Progress row');
     else { await visit('progress'); ok((await page.$$('#histList .row:not(.danger)')).length === h0, `Progress lists the ${h0} restored sessions`); await toHome(); }
@@ -72,10 +76,14 @@ let fails = 0; const ok = (c, s) => { console.log(`[${engine} ${mode}] ${c ? 'PA
     // talk freely
     await page.click('#pass');
     const left = await page.evaluate(() => SamtDebug.ctrl.passLeft());
-    ok(left > 8 && left <= 10, `talk freely: ${left.toFixed(1)} s left`);
-    await sleep(100); ok(/Talking freely/.test(await page.textContent('#liveText')), 'pill: ' + await page.textContent('#liveText'));
+    ok(left > 18 && left <= 20, `talk freely: ${left.toFixed(1)} s left`);
+    await sleep(100); ok(/^Echo back in 0:(19|20)$/.test(await page.textContent('#liveText')) && /^Add 20 s · 2 left$/.test(await page.textContent('#pass')), `pill "${await page.textContent('#liveText')}", button "${await page.textContent('#pass')}"`);
     await page.click('#pass'); const left2 = await page.evaluate(() => SamtDebug.ctrl.passLeft());
-    ok(left2 > 10.5, `a second tap adds 10 s (${left2.toFixed(1)} s left)`);
+    ok(left2 > 20.5 && left2 <= 40, `a second tap adds 20 s (${left2.toFixed(1)} s left)`);
+    // the third tap within 10 minutes still counts, then Talk freely is off for an hour (kept on the device)
+    await page.click('#pass'); await sleep(100);
+    const lock = await page.evaluate(() => { const s = JSON.parse(localStorage.getItem('samt.shared')); return { min: Math.round((s.freeLock - Date.now()) / 60000), left: SamtDebug.ctrl.passLeft() }; });
+    ok(lock.min === 60 && lock.left > 40 && await page.isDisabled('#pass') && /off for an hour/.test(await page.textContent('#toast')), `third tap: ${lock.left.toFixed(1)} s left, then off for ${lock.min} min; button off; "${await page.textContent('#toast')}"`);
     // a card and the sign from inside the session
     await page.click('#sCard'); await page.waitForSelector('#cardsPanel.show'); ok(true, 'Card opens in a session');
     await page.click('#cardsClose'); await page.waitForSelector('#cardsPanel', { state: 'hidden' });
@@ -98,12 +106,25 @@ let fails = 0; const ok = (c, s) => { console.log(`[${engine} ${mode}] ${c ? 'PA
     small = await smallText(); ok(!small.length, 'Details 390px text floor 16: ' + (small.join(', ') || 'ok'));
     await page.click('#detailsClose'); await page.waitForSelector('#detailsPanel', { state: 'hidden' });
     await page.setViewportSize({ width: 1024, height: 1366 }); await sleep(300);
-    // stopping: a tap keeps it going, a 2-second hold ends it
+    // pausing: a tap keeps it going, a 2-second hold pauses it (the clock stands still); Resume, then pause and End session
     await page.click('#stop'); await sleep(400);
-    ok((await view()) === 'session' && /Hold Stop/.test(await page.textContent('#toast')), 'a tap on Stop keeps the session: ' + await page.textContent('#toast'));
-    await hold('#stop');
+    ok((await view()) === 'session' && /Hold 2 seconds to pause/.test(await page.textContent('#toast')), 'a tap on the main button keeps the session: ' + await page.textContent('#toast'));
+    await hold('#stop'); await sleep(200);
+    const c1 = await page.textContent('#sReadout'); await sleep(2200); const c2 = await page.textContent('#sReadout');
+    ok(/^Echo back in (1:00|0:5\d)$/.test(await page.textContent('#liveText')) && await page.isVisible('#resume') && await page.isVisible('#endSession') && await page.isHidden('#stop') && await page.isHidden('#pass') && c1 === c2,
+      `a 2 s hold pauses: pill "${await page.textContent('#liveText')}", Resume and End session shown, clock stays ${c1} → ${c2}`);
+    await page.click('#resume'); await sleep(400);
+    ok(!(await page.evaluate(() => SamtDebug.session().paused)) && await page.isVisible('#stop') && await page.isHidden('#endSession'), 'Resume ends the pause early: ' + await page.textContent('#liveText'));
+    // a pause ends by itself after 60 s (the test moves the pause's start back instead of waiting)
+    await hold('#stop'); await sleep(200); const c3 = await page.textContent('#sReadout');
+    await page.evaluate(() => { const s = SamtDebug.session(); s.pausedAt -= 58000; if (s.endAt) s.endAt -= 58000; SamtDebug.tick(); }); // as if 58 s went by: the pause's start and the session's end move together
+    const near = await page.textContent('#liveText');
+    await page.evaluate(() => { const s = SamtDebug.session(); s.pausedAt -= 3000; if (s.endAt) s.endAt -= 3000; SamtDebug.tick(); }); await sleep(300);
+    ok(/^Echo back in 0:0[1-2]$/.test(near) && !(await page.evaluate(() => SamtDebug.session().paused)) && await page.isVisible('#stop') && Math.abs(toSec(await page.textContent('#sReadout')) - toSec(c3)) <= 2,
+      `after 60 s the echo is back by itself: "${near}" → paused ${await page.evaluate(() => SamtDebug.session().paused)}; clock ${c3} → ${await page.textContent('#sReadout')}`);
+    await hold('#stop'); await sleep(200); await page.click('#endSession');
     await page.waitForSelector('#endPanel.show', { timeout: 5000 });
-    ok(true, 'hold ends it; end sheet: ' + (await page.$$eval('#endStats .row', rs => rs.map(r => r.textContent).join(' | '))));
+    ok(true, 'End session from the pause; end sheet: ' + (await page.$$eval('#endStats .row', rs => rs.map(r => r.textContent).join(' | '))));
     await page.click('#moodSeg button:nth-of-type(2)'); await page.fill('#endNote', 'Hard in the meeting, easier after.');
     await shot('end_1024');
     await page.click('#askClaude');

@@ -22,8 +22,10 @@ How it is laid out, by stage (Home shows only what fits where you are):
   Settings.
 - **In a session** the screen shows only the session: Your voice or Sound level (one tap switches, and the session
   keeps its numbers), time left, the "Quiet for" timer, the live pill (with Sound level, − and + beside it move the line
-  on the level bar), a reminder, Talk freely, Card, Sign, and Stop, which takes a 2-second hold so it can't end by
-  accident (a test stops with a tap). Details (the numbers, a correction for the last verdict with Your voice, echo
+  on the level bar), a reminder, Talk freely, Card, Sign, and the main button: a 2-second hold pauses the session for
+  up to 60 seconds (the echo stops, the mic's sound is set aside and the clock stands still; the pill counts down "Echo
+  back in 0:45", then the echo is back by itself); Resume ends the pause early and End session finishes the session; a
+  test stops with a tap. A call or Siri pauses it too, until you tap Resume. Details (the numbers, a correction for the last verdict with Your voice, echo
   volume, muted sounds) opens as a sheet. The browser's Back can't leave a running session.
 - **Afterwards**, the end sheet: the numbers, a mood, a note, and Claude's summary if you ask for it.
 - **Progress**: today against the daily talk budget, days within it, the last 7 days as a chart, past sessions.
@@ -34,7 +36,9 @@ How it is laid out, by stage (Home shows only what fits where you are):
 
 Silence echoes whenever you talk. Conversation lets you talk for a while each turn (5 to 60 seconds) before the echo;
 talking over someone starts it at once (Your voice only); a soft two-note tone nudges you first. **Talk freely** gives
-you 10 seconds without the echo (each tap adds 10). Phrases that pass (v1 to v6) are gone: with Your voice, replies
+you 20 seconds without the echo (each tap adds 20, up to 60; the pill counts down "Echo back in 0:14"); any 3 taps
+within 10 minutes turn it off for an hour, on this device in Light and Neural alike (`samt.shared`: `freeTaps`,
+`freeLock`), so ending a session doesn't reset it. Phrases that pass (v1 to v6) are gone: with Your voice, replies
 under half a second still never echo.
 
 ## Sound level
@@ -123,6 +127,8 @@ microphone and check every page at phone and iPad widths. Ship only when they pa
 
 ## Notes
 
+- Taps never zoom the page or select text: every element is `touch-action: manipulation` (pinch zoom still works;
+  the hold-to-pause button is `none`), and text can't be selected except in typing fields.
 - ONNX Runtime Web is pinned to 1.20.1: 1.21 and later run away in WebKit on iOS / iPadOS 26.2 and kill the tab
   (microsoft/onnxruntime#26827).
 - The look follows the Quiet Glass design language from Repo-1 (`site/DESIGN-LANGUAGE.md`, `styles/ql/tokens.css`,

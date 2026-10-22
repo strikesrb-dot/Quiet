@@ -39,6 +39,8 @@ html.ql body.theme-dark {
 }
 @media (prefers-reduced-transparency: reduce) { html.ql { --q-glass:#fcfcf9; --q-blur:none; } html.ql body.theme-dark { --q-glass:#2c2b28; } }
 * { box-sizing: border-box; }
+* { touch-action: manipulation; } /* no double-tap zoom on iPhone; pinch zoom still works */
+html { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; } /* no text highlight from taps */
 [hidden] { display: none !important; }
 html, body { background: var(--q-page); }
 body { margin: 0; color: var(--q-ink); font: 400 var(--q-t-body)/1.45 var(--q-ui); -webkit-text-size-adjust: 100%;

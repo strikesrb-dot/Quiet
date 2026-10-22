@@ -53,6 +53,12 @@ html.ql body.theme-dark {
 }
 @media (prefers-reduced-transparency: reduce) { html.ql { --q-glass:#fcfcf9; --q-blur:none; } html.ql body.theme-dark { --q-glass:#2c2b28; } }
 * { box-sizing: border-box; }
+/* no double-tap zoom (two quick taps on − / +, Talk freely or a stepper zoomed the page on iPhone); pinch zoom still
+   works. The hold-to-stop button keeps touch-action: none (more specific, below). */
+* { touch-action: manipulation; }
+/* no text selection or press-and-hold menu from taps (it popped up too easily); typing fields keep both */
+html { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+input, textarea { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
 [hidden] { display: none !important; }
 html, body { background: var(--q-page); }
 body { margin: 0; color: var(--q-ink); font: 400 var(--q-t-body)/1.45 var(--q-ui); -webkit-text-size-adjust: 100%;
@@ -302,8 +308,8 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
 .session .live { justify-self: center; }
 .s-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--q-sp); }
 .s-row .btn { min-height: 54px; padding: 0 12px; }
-.s-row #stop { grid-column: 1 / -1; }
-@media (min-width: 700px) { .s-row { grid-template-columns: 1fr 1fr 1.5fr; } .s-row #stop { grid-column: auto; }
+.s-row #stop, .s-row #endSession { grid-column: 1 / -1; }
+@media (min-width: 700px) { .s-row { grid-template-columns: 1fr 1fr 1.5fr; } .s-row #stop, .s-row #endSession { grid-column: auto; }
   /* on a tablet or a computer a session sits in the middle of the screen, like a clock, not in its top half */
   body.in-session .win { min-height: calc(100vh - 52px); min-height: calc(100dvh - max(20px, env(safe-area-inset-top, 0px)) - max(32px, env(safe-area-inset-bottom, 0px))); align-content: center; } }
 .btn.hold { gap: 10px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
@@ -425,11 +431,12 @@ body.lv-mode .lvwrap .meter { height: 10px; }
     <div class="lvwrap"><div class="meter" aria-hidden="true"><i id="level"></i></div><span id="lineMark" class="linemark" aria-hidden="true" hidden></span><span id="lineSr" class="sr" aria-live="polite"></span></div>
     <div id="remind" class="remind" hidden></div>
     <button id="resume" class="btn strong" type="button" hidden>Resume</button>
-    <button id="pass" class="btn glass" type="button">Talk freely, 10 s</button>
+    <button id="pass" class="btn glass" type="button">Talk freely, 20 s</button>
     <div class="s-row">
       <button id="sCard" class="btn glass" type="button"><svg class="ic" aria-hidden="true"><use href="#i-card"/></svg>Card</button>
       <button id="sSign" class="btn glass" type="button"><svg class="ic" aria-hidden="true"><use href="#i-sign"/></svg>Sign</button>
-      <button id="stop" class="btn strong hold" type="button"><svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="track" cx="12" cy="12" r="9"/><circle class="fill" cx="12" cy="12" r="9" pathLength="100"/></svg><span id="stopText">Hold to stop</span></button>
+      <button id="stop" class="btn strong hold" type="button"><svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="track" cx="12" cy="12" r="9"/><circle class="fill" cx="12" cy="12" r="9" pathLength="100"/></svg><span id="stopText">Hold to pause</span></button>
+      <button id="endSession" class="btn glass" type="button" hidden>End session</button>
     </div>
     <button id="detailsBtn" class="btn plain" type="button"><svg class="ic up" aria-hidden="true"><use href="#i-chev"/></svg>Details</button>
   </section>

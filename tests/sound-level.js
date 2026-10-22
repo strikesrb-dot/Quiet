@@ -133,13 +133,13 @@ let fails = 0; const ok = (c, s) => { console.log(`[${engine} ${mode}] ${c ? 'PA
     const opens = await page.evaluate(n => SamtDebug.engine.echoLog.slice(n).filter(x => x[1] === true).length, log0);
     ok(opens > 0, `real session: the echo opened ${opens} times in the first minute of the stream`);
     await page.click('#pass'); await sleep(150);
-    ok((await page.evaluate(() => SamtDebug.ctrl.passLeft())) > 8 && /Talking freely/.test(await page.textContent('#liveText')), 'Talk freely: ' + await page.textContent('#liveText'));
+    ok((await page.evaluate(() => SamtDebug.ctrl.passLeft())) > 8 && /^Echo back in 0:(19|20)$/.test(await page.textContent('#liveText')), 'Talk freely: ' + await page.textContent('#liveText') + ' | ' + await page.textContent('#pass'));
     // the session screen on a phone, with a reminder
     await page.setViewportSize({ width: 390, height: 844 }); await sleep(400); await shot('session_390');
     ok((await overflow()) <= 0 && (await content()) <= 844, `session 390px: overflow ${await overflow()}px, content ${await content()}px of 844`);
     let small = await smallText(); ok(!small.length, 'session 390px text floor 16: ' + (small.join(', ') || 'ok'));
     await page.setViewportSize({ width: 1024, height: 1366 }); await sleep(300);
-    await hold('#stop'); await page.waitForSelector('#endPanel.show', { timeout: 8000 });
+    await hold('#stop'); await page.click('#endSession'); await page.waitForSelector('#endPanel.show', { timeout: 8000 });
     const rows = await page.$$eval('#endStats .row', rs => rs.map(r => r.textContent));
     ok(rows.some(r => /Echo by\s*Sound level/.test(r)), 'end sheet: ' + rows.join(' | '));
     await page.click('#askClaude'); await page.waitForSelector('#endSummary:not([hidden])', { timeout: 10000 });
@@ -159,7 +159,7 @@ let fails = 0; const ok = (c, s) => { console.log(`[${engine} ${mode}] ${c ? 'PA
     await page.evaluate(() => SamtDebug.feed('enroll_me', '/tests/audio/enroll_me.f32')); await sleep(500);
     const ev = await page.evaluate(() => { const e = SamtDebug.events; const n = e.find(x => x.type === 'nudge'), o = e.find(x => x.type === 'state' && x.state === 'echo'); return { nudge: n ? n.t : null, echo: o ? o.t : null }; });
     ok(ev.nudge != null && ev.echo != null && ev.echo > ev.nudge && ev.echo >= 4.5, `Conversation, 5 s turns: nudge at ${ev.nudge}s, echo at ${ev.echo}s`);
-    await setSpeed(+speed); await hold('#stop'); await page.waitForSelector('#endPanel.show', { timeout: 8000 }); await page.click('#endDone'); await page.waitForSelector('#endPanel', { state: 'hidden' });
+    await setSpeed(+speed); await hold('#stop'); await page.click('#endSession'); await page.waitForSelector('#endPanel.show', { timeout: 8000 }); await page.click('#endDone'); await page.waitForSelector('#endPanel', { state: 'hidden' });
     await page.click('#kindSeg button:nth-of-type(1)');
     // 7. the check on the line (Settings → Step-by-step setup → Check it), near voices then voices as loud as yours
     await page.click('#toSettings'); await sleep(200); await page.click('#toWizard'); await sleep(300);

@@ -53,6 +53,12 @@ html.ql body.theme-dark {
 }
 @media (prefers-reduced-transparency: reduce) { html.ql { --q-glass:#fcfcf9; --q-blur:none; } html.ql body.theme-dark { --q-glass:#2c2b28; } }
 * { box-sizing: border-box; }
+/* no double-tap zoom (two quick taps on − / +, Talk freely or a stepper zoomed the page on iPhone); pinch zoom still
+   works. The hold-to-stop button keeps touch-action: none (more specific, below). */
+* { touch-action: manipulation; }
+/* no text selection or press-and-hold menu from taps (it popped up too easily); typing fields keep both */
+html { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+input, textarea { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
 [hidden] { display: none !important; }
 html, body { background: var(--q-page); }
 body { margin: 0; color: var(--q-ink); font: 400 var(--q-t-body)/1.45 var(--q-ui); -webkit-text-size-adjust: 100%;
@@ -302,8 +308,8 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
 .session .live { justify-self: center; }
 .s-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--q-sp); }
 .s-row .btn { min-height: 54px; padding: 0 12px; }
-.s-row #stop { grid-column: 1 / -1; }
-@media (min-width: 700px) { .s-row { grid-template-columns: 1fr 1fr 1.5fr; } .s-row #stop { grid-column: auto; }
+.s-row #stop, .s-row #endSession { grid-column: 1 / -1; }
+@media (min-width: 700px) { .s-row { grid-template-columns: 1fr 1fr 1.5fr; } .s-row #stop, .s-row #endSession { grid-column: auto; }
   /* on a tablet or a computer a session sits in the middle of the screen, like a clock, not in its top half */
   body.in-session .win { min-height: calc(100vh - 52px); min-height: calc(100dvh - max(20px, env(safe-area-inset-top, 0px)) - max(32px, env(safe-area-inset-bottom, 0px))); align-content: center; } }
 .btn.hold { gap: 10px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
@@ -425,11 +431,12 @@ body.lv-mode .lvwrap .meter { height: 10px; }
     <div class="lvwrap"><div class="meter" aria-hidden="true"><i id="level"></i></div><span id="lineMark" class="linemark" aria-hidden="true" hidden></span><span id="lineSr" class="sr" aria-live="polite"></span></div>
     <div id="remind" class="remind" hidden></div>
     <button id="resume" class="btn strong" type="button" hidden>Resume</button>
-    <button id="pass" class="btn glass" type="button">Talk freely, 10 s</button>
+    <button id="pass" class="btn glass" type="button">Talk freely, 20 s</button>
     <div class="s-row">
       <button id="sCard" class="btn glass" type="button"><svg class="ic" aria-hidden="true"><use href="#i-card"/></svg>Card</button>
       <button id="sSign" class="btn glass" type="button"><svg class="ic" aria-hidden="true"><use href="#i-sign"/></svg>Sign</button>
-      <button id="stop" class="btn strong hold" type="button"><svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="track" cx="12" cy="12" r="9"/><circle class="fill" cx="12" cy="12" r="9" pathLength="100"/></svg><span id="stopText">Hold to stop</span></button>
+      <button id="stop" class="btn strong hold" type="button"><svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="track" cx="12" cy="12" r="9"/><circle class="fill" cx="12" cy="12" r="9" pathLength="100"/></svg><span id="stopText">Hold to pause</span></button>
+      <button id="endSession" class="btn glass" type="button" hidden>End session</button>
     </div>
     <button id="detailsBtn" class="btn plain" type="button"><svg class="ic up" aria-hidden="true"><use href="#i-chev"/></svg>Details</button>
   </section>
@@ -2039,6 +2046,15 @@ registerProcessor('samt-tap', SamtTap);
     .map(m => ({ id: String(m.id || 'm' + Date.now().toString(36)), kind: ['hum', 'tone', 'whine'].includes(m.kind) ? m.kind : 'tone', tones: m.tones.slice(0, 6).map(t => ({ f: +t.f, q: +t.q })), at: +m.at || 0 })).slice(-MAX_MUTES);
   shared.line = shared.line == null || !Number.isFinite(+shared.line) ? null : clampLine(+shared.line); shared.mutes = cleanMutes(shared.mutes);
   const saveShared = () => { try { localStorage.setItem('samt.shared', JSON.stringify(shared)); } catch (e) {} };
+  /* Talk freely: 20 s a tap (up to 60 s at once). Any 3 taps within 10 minutes turn it off for an hour, across sessions
+     and in Light and Neural alike (shared.freeTaps: recent tap times; shared.freeLock: when it's back). */
+  const FREE_SEC = 20, FREE_MAX = 60, FREE_TAPS = 3, FREE_WINDOW = 10 * 60000, FREE_LOCK = 60 * 60000;
+  shared.freeTaps = Array.isArray(shared.freeTaps) ? shared.freeTaps.filter(t => Number.isFinite(+t)).map(Number).slice(-FREE_TAPS) : [];
+  shared.freeLock = Number.isFinite(+shared.freeLock) ? +shared.freeLock : 0;
+  function freeState() {
+    const now = Date.now(); shared.freeTaps = shared.freeTaps.filter(t => now - t < FREE_WINDOW && t <= now);
+    return { locked: shared.freeLock > now, lockLeft: Math.max(0, shared.freeLock - now) / 1000, left: FREE_TAPS - shared.freeTaps.length };
+  }
 
   /* ---------- state ---------- */
   const listener = new Listener(), teacher = new Teacher(listener);
@@ -2058,6 +2074,7 @@ registerProcessor('samt-tap', SamtTap);
   const tick = () => new Promise(r => setTimeout(r, 30));
 
   function onAudio(c) {
+    if (session && session.paused) return; // a paused session's sound is set aside: no echo, no counting, no clock
     listener.push(c);
     if (gateTap) gateTap.push(c);
     if (capture) capture.add(c);
@@ -2181,7 +2198,7 @@ registerProcessor('samt-tap', SamtTap);
     const loop = () => {
       if (!mic.live) { meterOn = false; return; }
       // Sound level: the bar shows what the gate measures (muted pitches cut) and turns dark while it's over the line
-      const g = gateTap, lv = g ? g.level : listener.level, x = Math.max(0, Math.min(1, (lv + 70) / 55));
+      const g = gateTap, lv = session && session.paused ? -90 : g ? g.level : listener.level, x = Math.max(0, Math.min(1, (lv + 70) / 55));
       $('level').style.transform = `scaleX(${x.toFixed(3)})`; $('level').parentNode.classList.toggle('over', !!(g && lv >= g.p.line));
       requestAnimationFrame(loop);
     };
@@ -2193,7 +2210,7 @@ registerProcessor('samt-tap', SamtTap);
     // interrupted (call, Siri, lock, app switch), muted, or ended: stop the echo at once and ask for a tap
     mic.setEcho(false);
     if (capture) cancelMute('The mic stopped. Try again.'); // listening to a sound to mute
-    if (session && !session.paused) { session.paused = true; if (ctrl) ctrl.cut(); live('paused', 'Paused. Tap Resume.'); render(); }
+    if (session && !session.paused) pauseSession(false);
     else if (rec && (rec.kind === 'me' || rec.kind === 'oth')) {
       // a call or Siri mid-reading: keep what was read, wait for Resume
       if (!rec.paused) { rec.paused = true; $('recHint').textContent = 'Paused. What you read so far is kept. Tap Resume to keep going.'; $('recResume').hidden = false; }
@@ -2204,12 +2221,14 @@ registerProcessor('samt-tap', SamtTap);
   async function resumeAudio() {
     if (!session) return;
     requestWake(); mic.prime();
+    if (session.holdPause && micOk()) { endPause(); return; } // a held pause: the mic never stopped
     try {
       if (!mic.trackLive()) { mic.stop(); await ensureMic(); }
       else if (!(await mic.resume())) throw Object.assign(new Error('x'), { name: 'AudioNotRunning' });
       const left = ctrl ? ctrl.passLeft() : 0; // Talk freely's time left, read before the Listener's frames start again
+      if (FAKE) session.fakeSec = (session.fakeSec || 0) + listener.fs.nFrames / 100; // the test mic's audio time so far
       listener.reset(); if (ctrl && ctrl.resync) ctrl.resync(left);
-      session.paused = false; note(''); live('on', session.mode === 'test' ? 'Testing. Listening' : 'Listening'); render();
+      endPause();
     } catch (e) { note(micError(e)); }
   }
 
@@ -2629,27 +2648,40 @@ registerProcessor('samt-tap', SamtTap);
       session.timer = setInterval(tickSession, 250); tickSession();
     }, e => { setBusy(null); releaseWake(); note(micError(e)); });
   }
+  /* A session's clock stands still while it's paused: pausedAt is when the pause began, pauseMs the pauses before it. */
+  const sessionNow = s => s.paused && s.pausedAt ? s.pausedAt : Date.now();
+  const activeMs = s => Math.max(0, sessionNow(s) - s.startedAt - (s.pauseMs || 0));
   /* The session as a record for the past-sessions list (null for a test). With the test mic, the length is audio time. */
   function sessionSnap() {
     const s = session; if (!s || s.mode === 'test' || !ctrl) return null;
     const c = ctrl.counts;
-    return { id: s.recId, at: s.startedAt, dur: FAKE ? Math.round(listener.fs.nFrames / 100) : Math.max(0, Math.round((Date.now() - s.startedAt) / 1000)), page: MODE, kind: s.kind, who: s.usedLevel ? 'level' : 'voice', talkTime: +c.talkTime.toFixed(2), meSec: +c.meSec.toFixed(2), otherSec: +c.otherSec.toFixed(2),
+    return { id: s.recId, at: s.startedAt, dur: FAKE ? Math.round((s.fakeSec || 0) + listener.fs.nFrames / 100) : Math.round(activeMs(s) / 1000), page: MODE, kind: s.kind, who: s.usedLevel ? 'level' : 'voice', talkTime: +c.talkTime.toFixed(2), meSec: +c.meSec.toFixed(2), otherSec: +c.otherSec.toFixed(2),
       talks: c.talk, interrupts: c.interrupt, nudges: c.nudge, freePass: c.freePass, shorts: c.short, others: c.other, bestQuiet: Math.round(s.bestQuiet) };
   }
   function tickSession() {
     if (!session) return;
-    if (session.endAt) { const left = (session.endAt - Date.now()) / 1000; $('sReadout').textContent = fmt(left); if (left <= 0) { stopSession(true); return; } }
-    else $('sReadout').textContent = fmt((Date.now() - session.startedAt) / 1000);
+    // a held pause: the time until the echo is back, then back by itself (if a call took the mic meanwhile, it waits for Resume)
+    if (session.paused && session.holdPause) {
+      const p = pauseLeft();
+      if (p > 0) live('paused', `Echo back in ${clock(Math.ceil(p))}`);
+      else if (micOk()) endPause();
+      else { session.holdPause = false; live('paused', 'Paused. Tap Resume.'); render(); }
+    }
+    if (session.endAt) { const left = (session.endAt - sessionNow(session)) / 1000; $('sReadout').textContent = fmt(left); if (left <= 0 && !session.paused) { stopSession(true); return; } }
+    else $('sReadout').textContent = fmt(activeMs(session) / 1000);
     if (!ctrl || session.paused) return;
     // the quiet timer: since your last words (or since the start)
     const g = ctrl.seg, talking = ctrl.talking ? ctrl.talking() : !!(g && g.speaker === 'me');
     const quiet = talking ? 0 : Math.max(0, ((ctrl.frameNow ? ctrl.frameNow() : listener.fs.nFrames) - ctrl.lastMeEnd) / 100);
     session.bestQuiet = Math.max(session.bestQuiet, quiet);
     $('quietLine').firstChild.textContent = talking ? 'Talking' : 'Quiet for '; $('quietFor').textContent = talking ? '' : clock(quiet);
-    // talk freely: the countdown on the pill and the button
-    const left = ctrl.passLeft();
-    $('pass').textContent = left > 0 ? `Talking freely, ${Math.ceil(left)} s` : 'Talk freely, 10 s';
-    if (left > 0) { live('pass', `Talking freely for ${Math.ceil(left)} s`); session.passing = true; }
+    // talk freely: the time until the echo is back on the pill; on the button, adding 20 s and how many taps are left,
+    // or when Talk freely is back
+    const left = ctrl.passLeft(), fs = freeState();
+    $('pass').textContent = fs.locked ? `Talk freely in ${clock(fs.lockLeft)}`
+      : (left > 0 ? `Add ${FREE_SEC} s` : `Talk freely, ${FREE_SEC} s`) + (fs.left < FREE_TAPS ? ` · ${fs.left} left` : '');
+    $('pass').disabled = fs.locked;
+    if (left > 0) { live('pass', `Echo back in ${clock(Math.ceil(left))}`); session.passing = true; }
     else if (session.passing) { session.passing = false; live('on', 'Listening'); }
     renderTL(); $('cTalkTime').textContent = clock(ctrl.counts.talkTime);
     if (session.mode === 'test') return;
@@ -2695,6 +2727,40 @@ registerProcessor('samt-tap', SamtTap);
       setBusy(null);
       live(finished ? 'done' : 'off', finished ? `Done. You talked ${c.talk} time${c.talk === 1 ? '' : 's'}.` : 'Stopped');
     }
+  }
+  /* Paused: the echo stops and the clock stands still. From a hold on the main button (byHold: the mic is let go too,
+     and Resume starts it again inside its tap), or from a call, Siri or the screen locking. Resume carries on; End
+     session finishes it. */
+  function pauseSession(byHold) {
+    if (!session || session.paused) return;
+    session.paused = true; session.pausedAt = Date.now(); session.holdPause = !!byHold;
+    if (ctrl) { try { ctrl.cut(); } catch (e) {} }
+    mic.setEcho(false); if (capture && capture.inSession) cancelMute('');
+    live('paused', byHold ? `Echo back in ${clock(PAUSE_SEC)}` : 'Paused. Tap Resume.'); render();
+    setTimeout(() => { if (session && session.paused) $('resume').focus({ preventScroll: true }); }, 60);
+  }
+  /* A held pause lasts PAUSE_SEC at most, then the echo comes back by itself. The mic keeps running through it (its
+     sound is set aside), because iPhone Safari won't reliably start a mic again without a tap. */
+  const PAUSE_SEC = 60;
+  const pauseLeft = () => session && session.holdPause ? Math.max(0, PAUSE_SEC - (Date.now() - session.pausedAt) / 1000) : 0;
+  const micOk = () => mic.running && mic.trackLive();
+  /* The pause is over: the clock carries on from where it stopped (a pause doesn't count toward the session's time). */
+  function endPause() {
+    if (!session || !session.paused) return;
+    const d = Date.now() - session.pausedAt; session.pauseMs = (session.pauseMs || 0) + d; if (session.endAt) session.endAt += d;
+    session.pausedAt = 0; session.paused = false; session.holdPause = false;
+    note(''); live('on', session.mode === 'test' ? 'Testing. Listening' : 'Listening'); render();
+  }
+  /* Talk freely: 20 s more without the echo; the third tap within 10 minutes still counts, then it's off for an hour. */
+  function talkFreely() {
+    if (!ctrl || !session || session.mode === 'test' || session.paused) return;
+    if (freeState().locked) return;
+    const now = Date.now(); shared.freeTaps.push(now);
+    const third = shared.freeTaps.length >= FREE_TAPS;
+    if (third) { shared.freeLock = now + FREE_LOCK; shared.freeTaps = []; }
+    saveShared();
+    ctrl.pass(Math.min(FREE_MAX, ctrl.passLeft() + FREE_SEC)); tickSession();
+    if (third) toast('That was 3 in 10 minutes: Talk freely is off for an hour after this one.');
   }
   async function requestWake() { try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch (e) { wakeLock = null; } }
   function releaseWake() { try { if (wakeLock) wakeLock.release(); } catch (e) {} wakeLock = null; }
@@ -2987,16 +3053,17 @@ registerProcessor('samt-tap', SamtTap);
     $('matchStatus').textContent = LEVEL[settings.strict];
   }
   const convText = () => `${settings.limit} s turns · ${settings.noInterrupt ? 'no interrupting' : 'interrupting allowed'} · ${settings.nudge ? 'nudge first' : 'no nudge'}`;
-  /* Ending a real session takes a 2-second hold while a ring fills, so it can't happen by accident or on impulse. A test stops with a tap. */
+  /* Pausing a real session takes a 2-second hold while a ring fills, so it can't happen by accident or on impulse; from
+     the pause, Resume or End session. A test stops with a tap. */
   function wireHoldStop() {
     const b = $('stop'); let t = 0;
-    const cancel = tell => { if (!t) return; clearTimeout(t); t = 0; b.classList.remove('holding'); if (tell) toast('Hold Stop for 2 seconds to end the session.'); };
+    const cancel = tell => { if (!t) return; clearTimeout(t); t = 0; b.classList.remove('holding'); if (tell) toast('Hold 2 seconds to pause.'); };
     const begin = () => {
-      if (!session) return;
+      if (!session || session.paused) return;
       if (session.mode === 'test') { stopSession(false); return; }
       if (t) return;
       b.classList.add('holding');
-      t = setTimeout(() => { t = 0; b.classList.remove('holding'); stopSession(false); }, 2000);
+      t = setTimeout(() => { t = 0; b.classList.remove('holding'); pauseSession(true); }, 2000);
     };
     b.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' || e.button === 0) begin(); });
     b.addEventListener('pointerup', () => cancel(true));
@@ -3301,8 +3368,8 @@ registerProcessor('samt-tap', SamtTap);
     $('endTeachOthers').disabled = !idle;
     $('muteStatus').textContent = shared.mutes.length ? String(shared.mutes.length) : 'None';
     // the session view
-    $('resume').hidden = !paused; $('pass').hidden = paused || test;
-    $('stopText').textContent = test ? 'Stop test' : 'Hold to stop'; $('stop').classList.toggle('hold', !test); $('stop').querySelector('.ring').style.display = test ? 'none' : '';
+    $('resume').hidden = !paused; $('pass').hidden = paused || test; $('stop').hidden = paused; $('endSession').hidden = !paused;
+    $('stopText').textContent = test ? 'Stop test' : 'Hold to pause'; $('stop').classList.toggle('hold', !test); $('stop').querySelector('.ring').style.display = test ? 'none' : '';
     $('sWhoSeg').querySelectorAll('button').forEach((b, i) => { b.disabled = paused || (i === 0 && !voiceUsable()); });
     // setup, step by step
     $('wizStatus').textContent = wizStatusText(); $('toWizard').disabled = !idle;
@@ -3373,7 +3440,8 @@ registerProcessor('samt-tap', SamtTap);
     // what turns the echo on: Your voice (the voice check) or Sound level (the line); on Home, and mid-session
     const WHO = [{ v: 'voice', label: 'Your voice' }, { v: 'level', label: 'Sound level' }];
     whoCtl = seg($('whoSeg'), WHO, settings.who, setWho); sWhoCtl = seg($('sWhoSeg'), WHO, settings.who, setWho);
-    $('pass').onclick = () => { if (!ctrl || !session || session.mode === 'test' || session.paused) return; ctrl.pass(Math.min(60, ctrl.passLeft() + 10)); tickSession(); };
+    $('pass').onclick = talkFreely;
+    $('endSession').onclick = () => { if (session && session.paused) stopSession(false); };
     const applyConv = () => { if (ctrl && session && session.kind === 'conversation') Object.assign(ctrl.p, convParams()); render(); };
     const sw = (id, key) => { const el = $(id), sync = () => el.setAttribute('aria-checked', String(!!settings[key])); el.onclick = () => { settings[key] = !settings[key]; saveSettings(); sync(); applyConv(); }; sync(); };
     sw('swInterrupt', 'noInterrupt'); sw('swNudge', 'nudge');
@@ -3461,6 +3529,7 @@ registerProcessor('samt-tap', SamtTap);
     setTimeout(() => { try { for (const f of ['"Amiri Quran"', 'Amiri', '"Samt Arabic"']) document.fonts.load('26px ' + f, 'ق').catch(() => {}); } catch (e) {} }, 2000);
     debug.history = () => history; debug.shared = shared; debug.view = () => view; debug.trouble = onTrouble;
     debug.wiz = () => ({ at: wizAt, states: WSTEPS.map(s => stepState(s.id)), check: wiz.check, done: wiz.done, strict: settings.strict, who: settings.who });
+    debug.session = () => session; debug.tick = () => tickSession(); // the tests move a pause's start back to reach its end
     debug.line = () => lineNow(); debug.setLine = setLine; debug.mutes = () => shared.mutes; debug.gate = () => gateTap;
     if (FAKE) { debug.feed = async (name, url) => { const b = await (await fetch(url)).arrayBuffer(); return mic.play(name, new Float32Array(b)); }; debug.ensureEngine = ensureMic; }
   }

@@ -129,8 +129,10 @@ const PORT = 8770 + Math.floor(Math.random() * 100);
     out(`Details: You ${await page.textContent('#tlMe')} · talk ${await page.textContent('#cTalkTime')} · echoed ${await page.textContent('#cTalk')} · volume ${await page.textContent('#dVolOut')}`);
     if (await page.isVisible('#last')) { const b = await page.$('#notMe:not([disabled])') || await page.$('#wasMe:not([disabled])'); if (b) { await b.click(); await sleep(200); out('correction: ' + await page.textContent('#lastText') + ' | ' + await page.textContent('#toast')); } }
     await page.click('#detailsClose'); await page.waitForSelector('#detailsPanel', { state: 'hidden' });
-    await page.click('#stop'); await sleep(300); out(`a tap on Stop: still ${await view()}`);
-    await hold('#stop');
+    await page.click('#stop'); await sleep(300); out(`a tap on Stop: still ${await view()} (${await page.textContent('#toast')})`);
+    await hold('#stop'); await sleep(200);
+    out(`a 2 s hold pauses: "${await page.textContent('#liveText')}", Resume ${await page.isVisible('#resume')}, End session ${await page.isVisible('#endSession')}`);
+    await page.click('#endSession');
     await page.waitForSelector('#endPanel.show', { timeout: 8000 }); out('end of session: ' + (await page.textContent('#endTitle')) + ` | under it: ${await view()}`);
     await page.click('#endDone'); await page.waitForSelector('#endPanel', { state: 'hidden' }); await idle();
     // 5. backup, restore and the erase sheet, from Settings
