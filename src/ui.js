@@ -8,6 +8,7 @@
   const params = new URLSearchParams(location.search);
   const FAKE = params.has('fakemic');
   const store = S.mic.openStore('samt');
+  const blobs = S.mic.openBlobs('samt-rec'); // recordings' audio, in parts
   const K = k => MODE + ':' + k;
   const PASSAGE = [
     "Alright, I'm reading this out loud so the app can learn what my voice sounds like.",
@@ -29,7 +30,7 @@
   const DEF = { mins: 30, delay: 200, vol: 100, strict: 0, kind: 'silence', limit: 15, noInterrupt: true, nudge: true, who: 'voice' };
   const settings = Object.assign({}, DEF, (() => { try { return JSON.parse(localStorage.getItem('samt.' + MODE + '.settings') || '{}'); } catch (e) { return {}; } })());
   settings.vol = Math.min(100, settings.vol); settings.strict = Math.max(-1, Math.min(1, Math.round(settings.strict))); delete settings.psens;
-  settings.kind = settings.kind === 'conversation' ? 'conversation' : 'silence'; settings.limit = Math.max(5, Math.min(60, Math.round(+settings.limit || 15)));
+  settings.mins = Math.max(5, Math.min(960, Math.round(+settings.mins || 30))); settings.kind = settings.kind === 'conversation' ? 'conversation' : 'silence'; settings.limit = Math.max(5, Math.min(60, Math.round(+settings.limit || 15)));
   settings.who = settings.who === 'level' ? 'level' : 'voice';
   const saveSettings = () => { try { localStorage.setItem('samt.' + MODE + '.settings', JSON.stringify(settings)); } catch (e) {} };
   const strictValue = () => settings.strict * 1.6;          // threshold moves by 0.8 of your score spread per step
@@ -63,6 +64,7 @@
   let profile = { meSegs: [], othSegs: [], adaptSegs: [] };
   let ortSession = null, modelP = null, modelMs = 0;
   let session = null; // {mode, endAt, startedAt, timer, paused}
+  let tape = null, tapeWait = false; // the recording running now: {r: Recorder, clip, chain, n, failed}
   let wakeLock = null, lastRec = null, toastTimer = 0, pendingFixes = [], howl = 0, echoHoldUntil = 0, starting = null;
   let history = [], endRec = null, endMood = null, moodCtl = null, showCtx = null, cardsEditing = false, txtResolve = null, strictCtl = null;
   const mic = FAKE ? new S.mic.FakeMic({ onChunk: onAudio }) : new S.mic.MicEngine({ onChunk: onAudio, onTrouble });
@@ -75,6 +77,7 @@
   const tick = () => new Promise(r => setTimeout(r, 30));
 
   function onAudio(c) {
+    if (tape) tape.r.add(c); // a recording without MediaRecorder (WAV) keeps going through a held pause: the mic is still on
     if (session && session.paused) return; // a paused session's sound is set aside: no echo, no counting, no clock
     listener.push(c);
     if (gateTap) gateTap.push(c);
@@ -93,7 +96,7 @@
   function fmt(sec) { const s = Math.max(0, Math.ceil(sec)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), r = s % 60; const mm = String(m).padStart(2, '0'), rr = String(r).padStart(2, '0'); return h ? `${h}:${mm}:${rr}` : `${mm}:${rr}`; }
   const pad2 = n => String(n).padStart(2, '0');
   function clock(sec) { const s = Math.max(0, Math.floor(sec || 0)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), r = s % 60; return h ? `${h}:${pad2(m)}:${pad2(r)}` : `${m}:${pad2(r)}`; }
-  function minsText(sec) { const s = Math.floor(sec || 0), m = s / 60; return m < 1 ? `${s} s` : m < 10 ? `${(Math.floor(m * 10) / 10).toString()} min` : `${Math.floor(m)} min`; }
+  function minsText(sec) { const s = Math.floor(sec || 0), m = s / 60; if (m >= 60) { const h = Math.floor(m / 60), r = Math.floor(m % 60); return r ? `${h} hr ${r} min` : `${h} hr`; } return m < 1 ? `${s} s` : m < 10 ? `${(Math.floor(m * 10) / 10).toString()} min` : `${Math.floor(m)} min`; }
   const dayKey = t => { const d = new Date(t); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
   const timeStr = t => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   function whenStr(t) {
@@ -210,6 +213,7 @@
     if (kind === 'unmuted') return;
     // interrupted (call, Siri, lock, app switch), muted, or ended: stop the echo at once and ask for a tap
     mic.setEcho(false);
+    if (tape) endTape('cut'); // a recording keeps what it has
     if (capture) cancelMute('The mic stopped. Try again.'); // listening to a sound to mute
     if (session && !session.paused) pauseSession(false);
     else if (rec && (rec.kind === 'me' || rec.kind === 'oth')) {
@@ -252,9 +256,11 @@
     await loadHistory();
     const i = history.findIndex(r => r.id === rec.id);
     if (i >= 0) history[i] = Object.assign({}, history[i], rec); else history.push(rec);
-    history.sort((a, b) => a.at - b.at); if (history.length > 500) history = history.slice(-500);
+    history.sort((a, b) => a.at - b.at); history = capHistory(history);
     await store.set('shared:history', history);
   }
+  /* The 500 newest sessions, and any older one that still has recordings (its audio would be lost with it). */
+  function capHistory(h) { let drop = h.length - 500; return drop > 0 ? h.filter(r => { if (drop > 0 && !(r.clips && r.clips.length)) { drop--; return false; } return true; }) : h; }
   async function dropRecord(id) { await loadHistory(); history = history.filter(r => r.id !== id); await store.set('shared:history', history); }
   function backup() {
     // phrases: none recorded; the field is there only so a v6 page (which expects it) can still restore this file
@@ -284,7 +290,7 @@
       if (Array.isArray(d.history)) {
         await loadHistory(); const ids = new Set(history.map(r => r.id));
         for (const r of d.history) if (r && typeof r.id === 'string' && +r.at > 0 && !ids.has(r.id)) history.push(r);
-        history.sort((a, b) => a.at - b.at); history = history.slice(-500); await store.set('shared:history', history);
+        history.sort((a, b) => a.at - b.at); history = capHistory(history); await store.set('shared:history', history);
       }
       await saveAll(); render(); renderHistory(); renderToday(); toast('Setup restored.');
     } catch (e) { note(e.message || "Couldn't read that file."); }
@@ -500,11 +506,20 @@
   closers.mute = () => { if (capture) cancelMute(''); closeSheet('mute'); };
 
   /* ---------- session ---------- */
-  function plannedMs() {
-    const until = $('until').value;
-    if (until) { const [h, m] = until.split(':').map(Number), t = new Date(); t.setHours(h, m, 0, 0); if (t.getTime() <= Date.now()) t.setDate(t.getDate() + 1); return t.getTime() - Date.now(); }
-    return Math.max(1, Math.min(720, settings.mins)) * 60000;
+  const MAX_MINS = 960; // sessions run up to 16 hours (and "Until a time" up to 16 hours away)
+  function untilMs() {
+    const until = $('until').value; if (!until) return null;
+    const [h, m] = until.split(':').map(Number), t = new Date(); t.setHours(h, m, 0, 0); if (t.getTime() <= Date.now()) t.setDate(t.getDate() + 1);
+    return t.getTime() - Date.now();
   }
+  function plannedMs() {
+    const u = untilMs();
+    return u != null ? Math.min(u, MAX_MINS * 60000) : Math.max(1, Math.min(MAX_MINS, settings.mins)) * 60000;
+  }
+  /* A length in words for the stepper: 45 min, 2 hr, 8 hr 15 min. */
+  const lenText = m => m < 60 ? `${m} min` : `${Math.floor(m / 60)} hr` + (m % 60 ? ` ${m % 60} min` : '');
+  /* A time readout; hours and over get the smaller hero size so 16:00:00 fits a phone. */
+  function setReadout(el, sec) { const t = fmt(sec); el.textContent = t; el.classList.toggle('long', t.length > 5); }
   function stateText(e) {
     const test = session && session.mode === 'test';
     if (session && session.who === 'level') {
@@ -656,8 +671,10 @@
   function sessionSnap() {
     const s = session; if (!s || s.mode === 'test' || !ctrl) return null;
     const c = ctrl.counts;
-    return { id: s.recId, at: s.startedAt, dur: FAKE ? Math.round((s.fakeSec || 0) + listener.fs.nFrames / 100) : Math.round(activeMs(s) / 1000), page: MODE, kind: s.kind, who: s.usedLevel ? 'level' : 'voice', talkTime: +c.talkTime.toFixed(2), meSec: +c.meSec.toFixed(2), otherSec: +c.otherSec.toFixed(2),
+    const out = { id: s.recId, at: s.startedAt, dur: FAKE ? Math.round((s.fakeSec || 0) + listener.fs.nFrames / 100) : Math.round(activeMs(s) / 1000), page: MODE, kind: s.kind, who: s.usedLevel ? 'level' : 'voice', talkTime: +c.talkTime.toFixed(2), meSec: +c.meSec.toFixed(2), otherSec: +c.otherSec.toFixed(2),
       talks: c.talk, interrupts: c.interrupt, nudges: c.nudge, freePass: c.freePass, shorts: c.short, others: c.other, bestQuiet: Math.round(s.bestQuiet) };
+    if (s.clipN) out.clips = (s.clips || []).map(x => Object.assign({}, x)); // its recordings (the audio is in blobs); [] once the only one was dropped
+    return out;
   }
   function tickSession() {
     if (!session) return;
@@ -668,8 +685,9 @@
       else if (micOk()) endPause();
       else { session.holdPause = false; live('paused', 'Paused. Tap Resume.'); render(); }
     }
-    if (session.endAt) { const left = (session.endAt - sessionNow(session)) / 1000; $('sReadout').textContent = fmt(left); if (left <= 0 && !session.paused) { stopSession(true); return; } }
-    else $('sReadout').textContent = fmt(activeMs(session) / 1000);
+    if (session.endAt) { const left = (session.endAt - sessionNow(session)) / 1000; setReadout($('sReadout'), left); if (left <= 0 && !session.paused && !session.stopping) { stopSession(true); return; } }
+    else setReadout($('sReadout'), activeMs(session) / 1000);
+    if (tape) { const sec = tape.r.sec(); tape.clip.dur = Math.round(sec); $('sRecText').textContent = clock(sec); if (!tape.rolling && (sec >= ROLL_SEC || tape.clip.bytes >= ROLL_BYTES)) rollTape(); }
     if (!ctrl || session.paused) return;
     // the quiet timer: since your last words (or since the start)
     const g = ctrl.seg, talking = ctrl.talking ? ctrl.talking() : !!(g && g.speaker === 'me');
@@ -679,16 +697,20 @@
     // talk freely: the time until the echo is back on the pill; on the button, adding 20 s and how many taps are left,
     // or when Talk freely is back
     const left = ctrl.passLeft(), fs = freeState();
-    $('pass').textContent = fs.locked ? `Talk freely in ${clock(fs.lockLeft)}`
-      : (left > 0 ? `Add ${FREE_SEC} s` : `Talk freely, ${FREE_SEC} s`) + (fs.left < FREE_TAPS ? ` · ${fs.left} left` : '');
-    $('pass').disabled = fs.locked;
-    if (left > 0) { live('pass', `Echo back in ${clock(Math.ceil(left))}`); session.passing = true; }
+    if (tape || session.echoOff) { $('pass').textContent = session.echoOff ? 'Turn the echo back on' : 'Turn the echo off'; $('pass').disabled = false; } // while recording: no limit
+    else {
+      $('pass').textContent = fs.locked ? `Talk freely in ${clock(fs.lockLeft)}`
+        : (left > 0 ? `Add ${FREE_SEC} s` : `Talk freely, ${FREE_SEC} s`) + (fs.left < FREE_TAPS ? ` · ${fs.left} left` : '');
+      $('pass').disabled = fs.locked;
+    }
+    if (session.echoOff) { live('pass', 'Echo off'); session.passing = true; }
+    else if (left > 0) { live('pass', `Echo back in ${clock(Math.ceil(left))}`); session.passing = true; }
     else if (session.passing) { session.passing = false; live('on', 'Listening'); }
     renderTL(); $('cTalkTime').textContent = clock(ctrl.counts.talkTime);
     if (session.mode === 'test') return;
     const now = Date.now();
     if (now - session.uiAt >= 1000) { session.uiAt = now; renderToday(true); budgetWarn(); }
-    if (now - session.savedAt >= 30000) { session.savedAt = now; const s = sessionSnap(); if (s) putRecord(Object.assign(s, { open: true })).catch(() => {}); } // in case the tab is closed
+    if (now - session.savedAt >= 30000) { session.savedAt = now; listNow(session); } // in case the tab is closed
   }
   function budgetWarn() {
     const m = dayTotals(), t = (m.get(dayKey(Date.now())) || { talk: 0 }).talk, bud = shared.budget * 60;
@@ -696,10 +718,11 @@
     if (session.warned < 2 && t >= bud) { session.warned = 2; toast("You've used today's talk budget."); }
   }
   async function stopSession(finished) {
-    if (!session) return;
+    if (!session || session.stopping) return;
+    if (tape || tapeEnd) { session.stopping = true; render(); try { await (tape ? endTape('end') : tapeEnd); } catch (e) {} if (!session) return; } // the recording's last part first
     if (ctrl && ctrl.seg) { try { ctrl.cut(); } catch (e) {} } // count the words still in progress
     if (capture && capture.inSession) cancelMute(''); // the session's mic is about to stop
-    const snap = sessionSnap(), adaptQ = session.adaptQ.concat(ctrl && ctrl.adaptQueue ? ctrl.adaptQueue : []); // Sound level adds none
+    const snap = sessionSnap(), adaptQ = session.adaptQ.concat(ctrl && ctrl.adaptQueue ? ctrl.adaptQueue : []), listed = !!session.listed; // Sound level adds no adaptQ
     clearInterval(session.timer); session = null;
     if (ctrl) ctrl.stop(); gateTap = null; syncWho();
     releaseMic(); if (!showCtx) releaseWake();
@@ -707,13 +730,14 @@
     $('remind').hidden = true; leaveSession();
     refreshReadout(); setBusy(null);
     live(finished ? 'done' : 'off', finished ? `Done. You talked ${c.talk} time${c.talk === 1 ? '' : 's'}.` : 'Stopped');
-    // keep the session (30 seconds or longer) and open its summary
-    if (snap && snap.dur >= 30) {
+    // keep the session (30 seconds or longer, or with a recording) and open its summary
+    if (snap && (snap.dur >= 30 || (snap.clips && snap.clips.length))) {
       snap.open = false;
       try { await putRecord(snap); } catch (e) {}
       renderHistory(); renderToday();
       openEnd(history.find(r => r.id === snap.id) || snap, false);
     }
+    else if (snap && listed) { try { await dropRecord(snap.id); } catch (e) {} renderHistory(); renderToday(); } // listed early, but too short to keep
     // keep learning: speech that was confidently you, plus any That was me / Not me from this session
     const q = adaptQ, fixes = pendingFixes.splice(0);
     if ((q.length || fixes.length) && voice) {
@@ -733,7 +757,7 @@
      and Resume starts it again inside its tap), or from a call, Siri or the screen locking. Resume carries on; End
      session finishes it. */
   function pauseSession(byHold) {
-    if (!session || session.paused) return;
+    if (!session || session.paused || session.stopping) return;
     session.paused = true; session.pausedAt = Date.now(); session.holdPause = !!byHold;
     if (ctrl) { try { ctrl.cut(); } catch (e) {} }
     mic.setEcho(false); if (capture && capture.inSession) cancelMute('');
@@ -762,6 +786,177 @@
     saveShared();
     ctrl.pass(Math.min(FREE_MAX, ctrl.passLeft() + FREE_SEC)); tickSession();
     if (third) toast('That was 3 in 10 minutes: Talk freely is off for an hour after this one.');
+  }
+  /* ---------- recording a session: the mic only (you and anyone near you), never the echo; kept on this device ---------- */
+  const ECHO_OFF_SEC = 24 * 3600; // "echo off" is a Talk freely with no end that isn't counted as a tap
+  let ROLL_SEC = 3600, ROLL_BYTES = 60e6; // a long recording carries on in a new file each hour (or 60 MB): each stays easy to play and save
+  let tapeEnd = null; // a recording being put away: ending the session waits for it
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  async function startTape(roll) {
+    if (!session || session.mode === 'test' || tape || tapeWait || tapeEnd || session.stopping) return;
+    if (session.paused && !session.holdPause) { if (!roll) toast('Tap Resume first.'); return; }
+    const stream = mic.recStream ? mic.recStream() : null; // inside the tap
+    tapeWait = true; render();
+    try {
+      let room = Infinity;
+      try { const e = navigator.storage && navigator.storage.estimate ? await Promise.race([navigator.storage.estimate(), wait(2000).then(() => null)]) : null; if (e && e.quota) room = e.quota - (e.usage || 0); } catch (e) {}
+      if (room < 25e6) { toast(roll ? 'This device is nearly out of room, so the recording stopped.' : 'Not enough room on this device to record.'); return; }
+      const s = session; if (!s || s.stopping || tape || (s.paused && !s.holdPause)) return;
+      const t = { r: null, clip: null, recId: s.recId, chain: Promise.resolve(), n: 0, failed: null, ended: false, settled: false, dropped: false };
+      const opts = { onPart: d => keepPart(t, d), onEnd: () => { if (tape === t) endTape('cut'); } };
+      try { t.r = new S.mic.Recorder(stream, opts); } catch (e) { t.r = new S.mic.Recorder(null, opts); } // MediaRecorder said no: WAV
+      s.clipN = (s.clipN || 0) + 1; // a clip's id is never used twice, even after a too-short one is dropped
+      t.clip = { id: `${s.recId}.${s.clipN}`, mime: t.r.mime, parts: 0, bytes: 0, dur: 0, at: Date.now(), done: false };
+      (s.clips = s.clips || []).push(t.clip); tape = t;
+      listNow(s); // listed at once, in case the tab closes
+      try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+    } catch (e) { toast("Couldn't start recording on this device."); }
+    finally { tapeWait = false; render(); if (session) tickSession(); }
+  }
+  /* The running session as it stands, into the past-sessions list (marked open), in case the tab is closed. */
+  function listNow(s) { if (!s || s !== session || s.stopping) return; const snap = sessionSnap(); if (snap) { s.listed = true; putRecord(Object.assign(snap, { open: true })).catch(() => {}); } }
+  /* A part to disk, in order; if one can't be saved, the recording stops with what it has. */
+  function keepPart(t, d) {
+    const c = t.clip, key = `${c.id}:${String(t.n++).padStart(5, '0')}`;
+    t.chain = t.chain.then(async () => {
+      if (t.failed || t.dropped) return;
+      const buf = d instanceof ArrayBuffer ? d : await (d.arrayBuffer ? d.arrayBuffer() : new Response(d).arrayBuffer());
+      await blobs.put(key, buf); c.parts++; c.bytes += buf.byteLength;
+      if (t.settled) saveClip(t); // it came in after the recording was put away (a slow browser): update the listing
+    }).catch(e => { if (!t.failed) { t.failed = e || new Error('not saved'); if (tape === t) endTape(e && e.name === 'QuotaExceededError' ? 'full' : 'fail'); } });
+  }
+  /* A clip's latest numbers into its session's listing, once that session isn't running any more. */
+  async function saveClip(t) {
+    if (session && session.recId === t.recId && !session.stopping) return; // the running session's next save carries them
+    try {
+      await loadHistory(); const r = history.find(x => x.id === t.recId);
+      if (r && Array.isArray(r.clips) && r.clips.some(x => x.id === t.clip.id)) await putRecord({ id: r.id, at: r.at, clips: r.clips.map(x => x.id === t.clip.id ? Object.assign({}, t.clip) : x) });
+    } catch (e) {}
+  }
+  /* Stops the recording and keeps it (why: '' a tap, 'end' the session is ending, 'roll' going on in a new file, 'cut'
+     the mic stopped, 'full' / 'fail' a part couldn't be saved). The echo comes back, except when it rolls on. Ending the
+     session waits for this (tapeEnd), so the listing always has the recording's last part and length. */
+  function endTape(why) {
+    const t = tape; if (!t) return tapeEnd || Promise.resolve();
+    tape = null; t.ended = true;
+    const s = session;
+    if (why !== 'roll' && s && s.echoOff) setEchoOff(false);
+    const p = (async () => {
+      try { await t.r.stop(); } catch (e) {}
+      const settled = await Promise.race([t.chain.then(() => true, () => true), wait(8000).then(() => false)]);
+      const c = t.clip, sec = t.r.sec();
+      c.dur = Math.round(sec); c.done = true;
+      // kept unless it's under a second, or the browser said it was done and nothing came (if it didn't say, parts may still come)
+      const kept = sec >= 1 && (c.parts > 0 || !t.r.confirmed || !settled);
+      if (!kept) { t.dropped = true; if (s && s.clips) s.clips = s.clips.filter(x => x !== c); blobs.del(c.id).catch(() => {}); }
+      t.settled = true;
+      listNow(s);
+      if (s && s === session) tickSession();
+      const say = { '': kept ? 'Recording saved. It shows with this session when the session ends.' : 'Too short to keep.',
+        cut: 'The mic stopped, so the recording did too.' + (kept ? ' What it got is kept.' : ''),
+        full: 'This device is out of room, so the recording stopped.' + (kept ? ' What it got is kept.' : ''),
+        fail: "Couldn't save the recording on this device, so it stopped." }[why];
+      if (say) toast(say);
+      return kept;
+    })().finally(() => { if (tapeEnd === p) tapeEnd = null; render(); });
+    tapeEnd = p; render();
+    return p;
+  }
+  /* A long recording rolls on into a new file; the echo stays as it was. */
+  async function rollTape() {
+    const t = tape; if (!t || t.rolling) return; t.rolling = true;
+    await endTape('roll');
+    if (session && !session.stopping) await startTape(true);
+    if (!tape && session && session.echoOff) setEchoOff(false); // it couldn't go on: the echo comes back, as when a recording stops
+  }
+  /* While recording, Talk freely's button turns the echo off and on, with no limit: no echo and no nudges, and your
+     talk still counts. Turning it back on gives back any Talk freely time that was left. */
+  const frameNow = () => ctrl && ctrl.frameNow ? ctrl.frameNow() : listener.fs.nFrames;
+  function setEchoOff(off) {
+    if (!session || !ctrl || !!session.echoOff === !!off) return;
+    session.echoOff = !!off;
+    if (off) { session.freeEnd = frameNow() + Math.round(ctrl.passLeft() * 100); ctrl.pass(ECHO_OFF_SEC, true); }
+    else { ctrl.pass(Math.max(0, ((session.freeEnd || 0) - frameNow()) / 100), true); session.freeEnd = 0; }
+    if (!off && !session.paused && !(ctrl.passLeft() > 0)) { session.passing = false; live('on', 'Listening'); }
+    tickSession();
+  }
+  /* A session's recordings in its sheet: play, save to a file, delete. A clip is put together from its parts when asked. */
+  let recUrls = [];
+  function stopPlayers() {
+    $('endRecs').querySelectorAll('audio').forEach(a => { try { a.pause(); a.removeAttribute('src'); a.load(); } catch (e) {} });
+    for (const u of recUrls) URL.revokeObjectURL(u); recUrls = [];
+  }
+  async function clipBlob(c) {
+    const parts = await blobs.parts(c.id);
+    if (!parts || !parts.length) return null;
+    if (c.mime === 'audio/wav') return new Blob([S.mic.wavHeader(parts.reduce((a, p) => a + p.byteLength, 0)), ...parts], { type: 'audio/wav' });
+    return new Blob(parts, { type: c.mime || 'audio/mp4' });
+  }
+  const clipExt = m => m === 'audio/wav' ? 'wav' : /webm/.test(m || '') ? 'webm' : 'm4a';
+  function clipName(c) { const d = new Date(c.at); return `samt-${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}.${clipExt(c.mime)}`; }
+  const sizeText = b => b >= 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b >= 1e6 ? Math.round(b / 1e5) / 10 + ' MB' : Math.max(1, Math.round(b / 1e3)) + ' KB';
+  function renderRecs(r) {
+    stopPlayers();
+    const box = $('endRecs'), clips = Array.isArray(r.clips) ? r.clips.filter(c => c && c.id) : [];
+    box.textContent = ''; box.hidden = $('capRecs').hidden = $('recsHint').hidden = !clips.length;
+    clips.forEach((c, i) => {
+      const row = document.createElement('div'); row.className = 'row';
+      const t = document.createElement('span'); t.className = 'rt'; t.textContent = clips.length > 1 ? `Recording ${i + 1}` : 'Recording';
+      const s2 = document.createElement('span'); s2.className = 'r2'; s2.textContent = `${timeStr(c.at)} · ${sizeText(+c.bytes || 0)}${c.done ? '' : ' · cut off'}`; t.appendChild(s2);
+      const v = document.createElement('span'); v.className = 'rv'; v.textContent = clock(c.dur);
+      row.append(t, v);
+      const bar = document.createElement('div'); bar.className = 'row btns';
+      const btn = (label, fn, cls) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn plain' + (cls ? ' ' + cls : ''); b.textContent = label; b.onclick = fn; bar.appendChild(b); return b; };
+      let urlP = null;
+      const ready = () => urlP || (urlP = clipBlob(c).then(b => { if (!b) { urlP = null; return null; } const u = URL.createObjectURL(b); recUrls.push(u); asLink(u); return u; }, () => { urlP = null; return null; }));
+      // once the audio is put together, Save is a plain link to it, so a tap saves it straight away (iPhone wants the tap)
+      const asLink = u => { const a = document.createElement('a'); a.className = 'btn plain'; a.href = u; a.download = clipName(c); a.textContent = 'Save'; if (save.parentNode) save.replaceWith(a); };
+      const missing = () => { s2.textContent = "This recording isn't on this device."; play.disabled = save.disabled = true; };
+      const play = btn('Play', async () => {
+        play.disabled = true;
+        const u = await ready(); if (!u) { missing(); return; }
+        const a = document.createElement('audio'); a.controls = true; a.preload = 'metadata';
+        const go = () => { a.play().catch(() => {}); };
+        // a recording without a length in it (Chrome's): seek to the end once so the player can show one
+        a.addEventListener('loadedmetadata', () => {
+          if (a.duration !== Infinity) { go(); return; }
+          a.addEventListener('timeupdate', function back() { a.removeEventListener('timeupdate', back); a.currentTime = 0; go(); });
+          a.currentTime = 1e7;
+        }, { once: true });
+        a.src = u;
+        const p = document.createElement('div'); p.className = 'row player'; p.appendChild(a); bar.after(p); play.remove();
+      });
+      const save = btn('Save', async () => {
+        save.disabled = true; // one at a time
+        const u = await ready(); if (!u) { missing(); return; }
+        const link = bar.querySelector('a[download]'); if (link) link.click();
+      });
+      btn('Delete', () => ask({ title: 'Delete this recording?', msg: "It's deleted from this device. A copy you saved stays.", actions: [{ label: 'Delete', danger: true, run: () => deleteClip(r, c) }] }), 'danger');
+      box.append(row, bar);
+      blobs.count(c.id).then(n => { if (!n) missing(); }).catch(() => {});
+    });
+  }
+  async function deleteClip(r, c) {
+    stopPlayers();
+    try { await blobs.del(c.id); } catch (e) {}
+    r.clips = (r.clips || []).filter(x => x.id !== c.id);
+    try { await putRecord({ id: r.id, at: r.at, clips: r.clips }); } catch (e) {}
+    if (endRec === r) renderRecs(r);
+    renderHistory(); toast('Recording deleted.');
+  }
+  /* Parts that no past session lists (a session dropped from the list, or one deleted on another page) go after a day.
+     Only when the list itself was read, so a failed read never takes recordings with it. */
+  async function sweepTapes() {
+    try {
+      const h = await store.get('shared:history'); if (!Array.isArray(h) || !h.length) return;
+      const keep = new Set(); for (const r of h) for (const c of (r && r.clips) || []) keep.add(c.id);
+      const old = new Set();
+      for (const k of await blobs.keys()) {
+        const id = String(k).split(':')[0]; if (keep.has(id) || old.has(id) || (tape && tape.clip.id === id)) continue;
+        const at = parseInt(id.slice(1), 36); if (at > 0 && Date.now() - at > 864e5) old.add(id);
+      }
+      for (const id of old) await blobs.del(id);
+    } catch (e) {}
   }
   async function requestWake() { try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch (e) { wakeLock = null; } }
   function releaseWake() { try { if (wakeLock) wakeLock.release(); } catch (e) {} wakeLock = null; }
@@ -839,7 +1034,8 @@
   function renderHistory() {
     const box = $('histList'); box.textContent = '';
     const live = session && session.recId; // the session running now is not a past one yet
-    const list = history.filter(r => r.id !== live).sort((a, b) => b.at - a.at).slice(0, 30);
+    const all = history.filter(r => r.id !== live).sort((a, b) => b.at - a.at);
+    const list = all.slice(0, 30).concat(all.slice(30).filter(r => r.clips && r.clips.length)); // the 30 newest, and older ones with recordings
     if (!list.length) {
       box.innerHTML = '<div class="empty"><span class="tile soft" aria-hidden="true"><svg class="ic"><use href="#i-hush"/></svg></span><b>No sessions yet</b><span>Each session you finish shows here, with how much you talked.</span></div>';
       return;
@@ -847,13 +1043,18 @@
     for (const r of list) {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'row';
       const t = document.createElement('span'); t.className = 'rt'; t.textContent = whenStr(r.at);
-      const s2 = document.createElement('span'); s2.className = 'r2'; s2.textContent = `${r.kind === 'conversation' ? 'Conversation' : 'Silence'}${r.who === 'level' ? ' · Sound level' : ''} · ${minsText(r.dur)}${MOODS[r.mood] ? ' · ' + MOODS[r.mood] : ''}`; t.appendChild(s2);
+      const s2 = document.createElement('span'); s2.className = 'r2'; s2.textContent = `${r.kind === 'conversation' ? 'Conversation' : 'Silence'}${r.who === 'level' ? ' · Sound level' : ''} · ${minsText(r.dur)}${MOODS[r.mood] ? ' · ' + MOODS[r.mood] : ''}${r.clips && r.clips.length ? ' · Recorded' : ''}`; t.appendChild(s2);
       const v = document.createElement('span'); v.className = 'rv'; v.textContent = clock(r.talkTime) + ' talk';
       b.append(t, v, chevron()); b.onclick = () => openEnd(r, true); box.appendChild(b);
     }
     const clr = document.createElement('button'); clr.type = 'button'; clr.className = 'row danger'; clr.textContent = 'Clear the past sessions';
-    clr.onclick = () => ask({ title: 'Clear the past sessions?', msg: 'Every past session on this device is deleted, for Light and Neural. Your voice setup stays.',
-      actions: [{ label: 'Clear them', danger: true, run: async () => { history = []; await store.set('shared:history', []); renderHistory(); renderToday(); toast('Cleared.'); } }] });
+    clr.onclick = () => ask({ title: 'Clear the past sessions?', msg: 'Every past session on this device is deleted, with its recordings, for Light and Neural. Your voice setup stays.',
+      actions: [{ label: 'Clear them', danger: true, run: async () => {
+        await loadHistory(); const gone = [].concat(...history.map(r => r.clips || []));
+        history = []; await store.set('shared:history', []);
+        for (const c of gone) await blobs.del(c.id).catch(() => {});
+        renderHistory(); renderToday(); toast('Cleared.');
+      } }] });
     box.appendChild(clr);
   }
 
@@ -879,11 +1080,12 @@
     $('askClaude').disabled = false; $('askClaude').textContent = rec.summary ? 'Ask Claude again' : 'Ask Claude for a summary';
     $('claudeHint').textContent = CLAUDE_HINT; $('endDelete').hidden = !review;
     $('endTip').hidden = !!review || rec.who === 'level' || !(rec.others > 0) || !!profile.othSegs.length || !!(voice && voice.N && voice.N.length);
+    renderRecs(rec);
     openSheet('end');
   }
   function showSummary(t) { $('endSummary').hidden = !t; $('endSummaryText').textContent = t || ''; }
   async function closeEnd() {
-    const r = endRec; endRec = null; closeSheet('end');
+    const r = endRec; endRec = null; stopPlayers(); closeSheet('end');
     if (!r) return;
     r.note = $('endNote').value.trim().slice(0, 300); r.mood = endMood;
     try { await putRecord({ id: r.id, at: r.at, mood: r.mood, note: r.note, summary: r.summary || '' }); } catch (e) {}
@@ -1345,7 +1547,7 @@
 
   /* ---------- rendering ---------- */
   function setBusy(b) { busy = b; render(); }
-  function refreshReadout() { if (!session) $('readout').textContent = fmt(plannedMs() / 1000); }
+  function refreshReadout() { if (!session) setReadout($('readout'), plannedMs() / 1000); }
   function render() {
     const taught = !!(voice && voice.ready), modelOk = MODE !== 'neural' || !!ortSession, idle = !busy;
     $('voiceStatus').textContent = taught ? `${Math.round(frames(profile.meSegs) / 100)} s` + (profile.adaptSegs.length || (voice.adapted && voice.adapted.length) ? ', learning' : '') : 'Not taught';
@@ -1370,6 +1572,9 @@
     $('muteStatus').textContent = shared.mutes.length ? String(shared.mutes.length) : 'None';
     // the session view
     $('resume').hidden = !paused; $('pass').hidden = paused || test; $('stop').hidden = paused; $('endSession').hidden = !paused;
+    $('sRec').hidden = test; $('sRec').classList.toggle('on', !!tape);
+    $('sRec').disabled = tapeWait || !!tapeEnd || !!(session && (session.stopping || (paused && !session.holdPause && !tape)));
+    if (tape) $('sRec').setAttribute('aria-label', 'Stop recording'); else { $('sRec').removeAttribute('aria-label'); $('sRecText').textContent = 'Record'; }
     $('stopText').textContent = test ? 'Stop test' : 'Hold to pause'; $('stop').classList.toggle('hold', !test); $('stop').querySelector('.ring').style.display = test ? 'none' : '';
     $('sWhoSeg').querySelectorAll('button').forEach((b, i) => { b.disabled = paused || (i === 0 && !voiceUsable()); });
     // setup, step by step
@@ -1441,7 +1646,8 @@
     // what turns the echo on: Your voice (the voice check) or Sound level (the line); on Home, and mid-session
     const WHO = [{ v: 'voice', label: 'Your voice' }, { v: 'level', label: 'Sound level' }];
     whoCtl = seg($('whoSeg'), WHO, settings.who, setWho); sWhoCtl = seg($('sWhoSeg'), WHO, settings.who, setWho);
-    $('pass').onclick = talkFreely;
+    $('pass').onclick = () => { if (tape || (session && session.echoOff)) setEchoOff(!(session && session.echoOff)); else talkFreely(); }; // while recording: the echo switch
+    $('sRec').onclick = () => { if (tape) endTape(''); else startTape(); };
     $('endSession').onclick = () => { if (session && session.paused) stopSession(false); };
     const applyConv = () => { if (ctrl && session && session.kind === 'conversation') Object.assign(ctrl.p, convParams()); render(); };
     const sw = (id, key) => { const el = $(id), sync = () => el.setAttribute('aria-checked', String(!!settings[key])); el.onclick = () => { settings[key] = !settings[key]; saveSettings(); sync(); applyConv(); }; sync(); };
@@ -1475,16 +1681,22 @@
     $('endDone').onclick = closeEnd; $('endClose').onclick = closeEnd; $('askClaude').onclick = askClaude;
     $('endDelete').onclick = () => {
       const r = endRec; if (!r) return;
-      ask({ title: 'Delete this session?', msg: 'It leaves the list and the totals.', actions: [{ label: 'Delete', danger: true, run: async () => { if (endRec === r) { endRec = null; closeSheet('end'); } await dropRecord(r.id); renderHistory(); renderToday(); } }] });
+      const clips = Array.isArray(r.clips) ? r.clips : [];
+      ask({ title: 'Delete this session?', msg: clips.length ? 'It leaves the list and the totals, and its recordings are deleted.' : 'It leaves the list and the totals.', actions: [{ label: 'Delete', danger: true, run: async () => {
+        if (endRec === r) { endRec = null; stopPlayers(); closeSheet('end'); }
+        await dropRecord(r.id); for (const c of clips) await blobs.del(c.id).catch(() => {});
+        renderHistory(); renderToday();
+      } }] });
     };
     // a line of text
     $('txtSave').onclick = () => endText(true); $('txtClose').onclick = () => endText(false);
     $('txtForm').addEventListener('submit', e => { e.preventDefault(); endText(true); });
-    const presets = seg($('presets'), [{ v: 15, label: '15 min' }, { v: 30, label: '30 min' }, { v: 60, label: '1 hr' }, { v: 120, label: '2 hr' }, { v: 240, label: '4 hr' }], settings.mins, v => { settings.mins = v; $('until').value = ''; saveSettings(); syncTimer(); });
-    const syncTimer = () => { $('minsOut').textContent = settings.mins; presets.set($('until').value ? null : settings.mins); $('clearUntil').hidden = !$('until').value; refreshReadout(); };
-    const stepMins = d => { settings.mins = Math.max(5, Math.min(720, settings.mins + d)); $('until').value = ''; saveSettings(); syncTimer(); };
-    $('minsDown').onclick = () => stepMins(settings.mins > 60 ? -15 : -5); $('minsUp').onclick = () => stepMins(settings.mins >= 60 ? 15 : 5);
-    $('until').oninput = syncTimer; $('clearUntil').onclick = () => { $('until').value = ''; syncTimer(); };
+    const presets = seg($('presets'), [{ v: 30, label: '30 min' }, { v: 60, label: '1 hr' }, { v: 120, label: '2 hr' }, { v: 480, label: '8 hr' }, { v: 960, label: '16 hr' }], settings.mins, v => { settings.mins = v; $('until').value = ''; saveSettings(); syncTimer(); });
+    const syncTimer = () => { $('minsOut').textContent = lenText(settings.mins); presets.set($('until').value ? null : settings.mins); $('clearUntil').hidden = !$('until').value; refreshReadout(); };
+    // − / +: 5 minutes under an hour, 15 up to 4 hours, then an hour at a time, up to 16 hours
+    const stepMins = d => { settings.mins = Math.max(5, Math.min(MAX_MINS, settings.mins + d)); $('until').value = ''; saveSettings(); syncTimer(); };
+    $('minsDown').onclick = () => stepMins(settings.mins > 240 ? -60 : settings.mins > 60 ? -15 : -5); $('minsUp').onclick = () => stepMins(settings.mins >= 240 ? 60 : settings.mins >= 60 ? 15 : 5);
+    $('until').oninput = () => { syncTimer(); if (untilMs() > MAX_MINS * 60000) toast('Sessions run up to 16 hours.'); }; $('clearUntil').onclick = () => { $('until').value = ''; syncTimer(); };
     const stepper = (key, down, up, out, step, lo, hi, fmtFn, apply) => {
       const show = () => { $(out).textContent = fmtFn(settings[key]); };
       $(down).onclick = () => { settings[key] = Math.max(lo, settings[key] - step); saveSettings(); show(); apply(); };
@@ -1524,13 +1736,14 @@
     goView('home', 'none');
     try { await loadHistory(); } catch (e) {}
     renderHistory(); renderToday(); render();
+    setTimeout(sweepTapes, 5000);
     setInterval(() => { if (!session) renderToday(true); }, 60000); // a new day starts at midnight
     document.addEventListener('visibilitychange', async () => { if (document.visibilityState === 'visible' && !session) { try { await loadHistory(); } catch (e) {} renderHistory(); renderToday(); } });
     // fetch the Amiri fonts once the page has settled, so a session's first reminder doesn't flash in another font
     setTimeout(() => { try { for (const f of ['"Amiri Quran"', 'Amiri', '"Samt Arabic"']) document.fonts.load('26px ' + f, 'ق').catch(() => {}); } catch (e) {} }, 2000);
     debug.history = () => history; debug.shared = shared; debug.view = () => view; debug.trouble = onTrouble;
     debug.wiz = () => ({ at: wizAt, states: WSTEPS.map(s => stepState(s.id)), check: wiz.check, done: wiz.done, strict: settings.strict, who: settings.who });
-    debug.session = () => session; debug.tick = () => tickSession(); // the tests move a pause's start back to reach its end
+    debug.session = () => session; debug.tick = () => tickSession(); debug.tape = () => tape; debug.blobs = blobs; debug.sweep = sweepTapes; debug.roll = (sec, bytes) => { ROLL_SEC = sec; if (bytes) ROLL_BYTES = bytes; }; // the tests move a pause's start back to reach its end
     debug.line = () => lineNow(); debug.setLine = setLine; debug.mutes = () => shared.mutes; debug.gate = () => gateTap;
     if (FAKE) { debug.feed = async (name, url) => { const b = await (await fetch(url)).arrayBuffer(); return mic.play(name, new Float32Array(b)); }; debug.ensureEngine = ensureMic; }
   }

@@ -87,6 +87,8 @@ registerProcessor('samt-tap', SamtTap);
       return this;
     }
     trackLive() { const t = this.stream && this.stream.getAudioTracks()[0]; return !!(t && t.readyState === 'live' && !t.muted); }
+    /* What a recording records: the mic's own stream, never the echo. */
+    recStream() { return this.stream || null; }
     get running() { return !!(this.live && this.ctx && this.ctx.state === 'running'); }
     async resume() { if (!this.ctx) return false; await withTimeout(this.ctx.resume().catch(() => {}), 1000); return this.ctx.state === 'running'; }
     setEcho(open) {
@@ -163,6 +165,17 @@ registerProcessor('samt-tap', SamtTap);
     setDelay() {} setVolume() {}
     setNotches(tones) { this.tones = (tones || []).slice(); }
     stop() { /* the test keeps one fake mic for the whole run */ }
+    /* Where the browser has MediaRecorder, a real stream to record (a quiet 220 Hz tone); elsewhere none, and a
+       recording is WAV built from the fake chunks. Call inside the tap. */
+    recStream() {
+      if (!G.MediaRecorder) return null;
+      if (!this.recDest) {
+        const AC = G.AudioContext || G.webkitAudioContext, ctx = this.recCtx = new AC(), o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.value = 220; g.gain.value = 0.05; this.recDest = ctx.createMediaStreamDestination(); o.connect(g); g.connect(this.recDest); o.start();
+      }
+      try { this.recCtx.resume(); } catch (e) {}
+      return this.recDest.stream;
+    }
   }
 
   /* IndexedDB key-value store. Reopens once if Safari dropped the connection; falls back to memory. */
@@ -198,6 +211,90 @@ registerProcessor('samt-tap', SamtTap);
     };
   }
 
+  /* ---------- recording a session ---------- */
+  /* Records the mic only, never the echo. MediaRecorder on the mic's own stream where the browser has one (iPhone: AAC,
+     saved as .m4a), else 16 kHz 16-bit WAV from the same chunks the listener gets (add()). A part comes out about every
+     10 s through onPart (a Blob, or an ArrayBuffer of samples); onEnd: the browser stopped it (the mic was cut off). */
+  const REC_TYPES = ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'];
+  class Recorder {
+    constructor(stream, { onPart, onEnd } = {}) {
+      this.onPart = onPart || (() => {}); this.onEnd = onEnd || (() => {});
+      this.t0 = Date.now(); this.t1 = 0; this.samples = 0; this.asked = false; this.over = false;
+      const MR = G.MediaRecorder;
+      if (stream && MR) {
+        const type = REC_TYPES.find(t => { try { return MR.isTypeSupported(t); } catch (e) { return false; } }) || '';
+        let mr;
+        try { mr = new MR(stream, Object.assign({ audioBitsPerSecond: 32000 }, type ? { mimeType: type } : {})); } catch (e) { mr = new MR(stream); }
+        this.kind = 'mr'; this.mr = mr;
+        this.mime = String(mr.mimeType || type || 'audio/mp4').split(';')[0].trim() || 'audio/mp4';
+        this.done = new Promise(res => { mr.onstop = () => { this.confirmed = true; this._end(); res(); if (!this.asked) this.onEnd(); }; }); // confirmed: every part has come
+        mr.ondataavailable = e => { if (e.data && e.data.size) this.onPart(e.data); };
+        mr.onerror = () => { try { if (mr.state !== 'inactive') mr.stop(); } catch (e) {} };
+        mr.start(10000);
+      } else {
+        this.kind = 'wav'; this.mime = 'audio/wav'; this.buf = new Int16Array(160000); this.n = 0; this.done = Promise.resolve(); this.confirmed = true;
+      }
+    }
+    _end() { if (!this.over) { this.over = true; this.t1 = Date.now(); } }
+    /* The WAV path: the mic's 16 kHz chunks. */
+    add(x) {
+      if (this.kind !== 'wav' || this.over) return;
+      for (let i = 0; i < x.length; i++) { const v = x[i] < -1 ? -1 : x[i] > 1 ? 1 : x[i]; this.buf[this.n++] = v < 0 ? v * 0x8000 : v * 0x7fff; if (this.n === this.buf.length) this._flush(); }
+      this.samples += x.length;
+    }
+    _flush() { if (this.n) { this.onPart(this.buf.slice(0, this.n).buffer); this.n = 0; } }
+    /* Seconds recorded so far. */
+    sec() { return this.kind === 'wav' ? this.samples / 16000 : ((this.over ? this.t1 : Date.now()) - this.t0) / 1000; }
+    /* Stops it; resolves once the last part has been handed over (a browser that never says so: after 4 s). */
+    stop() {
+      this.asked = true;
+      if (this.kind === 'wav') { if (!this.over) { this._flush(); this._end(); } return this.done; }
+      try { if (this.mr.state !== 'inactive') this.mr.stop(); } catch (e) {}
+      return Promise.race([this.done, new Promise(r => setTimeout(r, 4000))]).then(() => this._end());
+    }
+  }
+  /* The 44 bytes in front of 16 kHz mono 16-bit samples that make them a .wav file. */
+  function wavHeader(bytes, rate = 16000) {
+    const h = new DataView(new ArrayBuffer(44)), w = (o, t) => { for (let i = 0; i < 4; i++) h.setUint8(o + i, t.charCodeAt(i)); };
+    w(0, 'RIFF'); h.setUint32(4, 36 + bytes, true); w(8, 'WAVE'); w(12, 'fmt '); h.setUint32(16, 16, true); h.setUint16(20, 1, true); h.setUint16(22, 1, true);
+    h.setUint32(24, rate, true); h.setUint32(28, rate * 2, true); h.setUint16(32, 2, true); h.setUint16(34, 16, true); w(36, 'data'); h.setUint32(40, bytes, true);
+    return h.buffer;
+  }
+  /* Recordings' parts, straight to IndexedDB (no copy kept in memory, unlike openStore). A part's key is
+     `${clip}:${00000}`, so a clip's parts come back in order. */
+  function openBlobs(name) {
+    let dbp = null;
+    const open = () => new Promise((res, rej) => {
+      if (!G.indexedDB) { rej(new Error('no IndexedDB')); return; }
+      const r = G.indexedDB.open(name, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('parts');
+      r.onsuccess = () => { const db = r.result; db.onclose = () => { dbp = null; }; db.onversionchange = () => { db.close(); dbp = null; }; res(db); };
+      r.onerror = () => rej(r.error || new Error('open failed')); r.onblocked = () => rej(new Error('blocked'));
+    });
+    const getDb = () => (dbp = dbp || open().catch(e => { dbp = null; throw e; }));
+    const tx = async (mode, fn, retry = true) => {
+      const db = await getDb();
+      try {
+        return await new Promise((res, rej) => {
+          let t; try { t = db.transaction('parts', mode); } catch (e) { rej(e); return; }
+          const r = fn(t.objectStore('parts')); t.oncomplete = () => res(r && r.result);
+          t.onerror = ev => rej((ev && ev.target && ev.target.error) || t.error || new Error('IndexedDB error')); t.onabort = () => rej(t.error || new Error('aborted')); // a request's own error (QuotaExceededError): t.error is still null then
+        });
+      } catch (e) {
+        if (retry && e && e.name === 'InvalidStateError') { dbp = null; return tx(mode, fn, false); } // Safari dropped the connection
+        throw e;
+      }
+    };
+    const range = id => G.IDBKeyRange.bound(id + ':', id + ':\uffff');
+    return {
+      put: (key, buf) => tx('readwrite', s => s.put(buf, key)),
+      parts: id => tx('readonly', s => s.getAll(range(id))),
+      count: id => tx('readonly', s => s.count(range(id))),
+      keys: () => tx('readonly', s => s.getAllKeys()),
+      del: id => tx('readwrite', s => s.delete(range(id)))
+    };
+  }
+
   /* Backup files: typed arrays become base64 inside plain JSON. */
   function b64(u8) { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
   function unb64(s) { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
@@ -214,5 +311,5 @@ registerProcessor('samt-tap', SamtTap);
     return v;
   }
 
-  S.mic = { MicEngine, FakeMic, openStore, pack, unpack };
+  S.mic = { MicEngine, FakeMic, openStore, openBlobs, Recorder, wavHeader, pack, unpack };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

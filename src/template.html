@@ -84,6 +84,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .glass { background: var(--q-glass); -webkit-backdrop-filter: var(--q-blur); backdrop-filter: var(--q-blur); box-shadow: var(--q-glass-rim), var(--q-glass-edge), var(--q-sh-glass); }
 .hero { text-align: center; font: 700 var(--q-t-hero-s)/1 var(--q-ui); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 @media (min-width: 700px) { .hero { font-size: var(--q-t-hero); } .card { padding: 24px 28px; } }
+.hero.long { font-size: min(var(--q-t-hero), 16.5vw); } /* h:mm:ss (up to 16:00:00) fits a phone */
 .live { justify-self: center; display: inline-flex; align-items: center; gap: 10px; min-height: var(--tap); padding: 0 18px; border-radius: var(--q-r-cap);
   background: var(--q-fill); color: var(--q-ink2); font-size: var(--q-t-min); font-weight: 600; max-width: 100%; }
 .live .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--q-chev); flex: none; }
@@ -132,6 +133,11 @@ a.row { text-decoration: none; cursor: pointer; }
 .field.grow { flex: 1; }
 .field[type="time"] { min-width: 128px; }
 .rv.wrap { white-space: normal; text-align: end; }
+.recs .row.btns { padding-top: 0; }
+.btn.plain.danger { color: var(--q-danger); }
+.recs .row.btns::before, .recs .row.player::before { content: none; }
+.recs .row.player { padding-top: 0; }
+.recs audio { width: 100%; min-width: 0; height: 44px; }
 .field::placeholder { color: var(--q-ink2); }
 
 /* one segmented control */
@@ -306,10 +312,14 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
 .s-kind::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--q-acc); }
 .session .quietl { margin: 0; font-size: var(--q-t-body); }
 .session .live { justify-self: center; }
-.s-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--q-sp); }
-.s-row .btn { min-height: 54px; padding: 0 12px; }
+.s-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--q-sp); }
+.s-row .btn { min-height: 54px; padding: 0 10px; }
+/* recording: the button turns red and shows how long; the dot pulses */
+#sRec.on { color: var(--q-danger); font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: no-preference) { #sRec.on .ic { animation: recPulse 1.6s ease-in-out infinite; } }
+@keyframes recPulse { 50% { opacity: .35; } }
 .s-row #stop, .s-row #endSession { grid-column: 1 / -1; }
-@media (min-width: 700px) { .s-row { grid-template-columns: 1fr 1fr 1.5fr; } .s-row #stop, .s-row #endSession { grid-column: auto; }
+@media (min-width: 700px) { .s-row { grid-template-columns: 1fr 1fr 1fr 1.5fr; } .s-row #stop, .s-row #endSession { grid-column: auto; }
   /* on a tablet or a computer a session sits in the middle of the screen, like a clock, not in its top half */
   body.in-session .win { min-height: calc(100vh - 52px); min-height: calc(100dvh - max(20px, env(safe-area-inset-top, 0px)) - max(32px, env(safe-area-inset-bottom, 0px))); align-content: center; } }
 .btn.hold { gap: 10px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
@@ -374,6 +384,7 @@ body.lv-mode .lvwrap .meter { height: 10px; }
   <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-turn" viewBox="0 0 24 24"><path d="M4.5 10.5a8 8 0 0 1 14-3.5l1.5 1.5"/><path d="M20 4v4.5h-4.5"/><path d="M19.5 13.5a8 8 0 0 1-14 3.5L4 15.5"/><path d="M4 20v-4.5h4.5"/></symbol>
   <symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+  <symbol id="i-rec" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle class="dot" cx="12" cy="12" r="3.6" fill="currentColor" stroke="none"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M6 12h12M12 6v12"/></symbol>
   <symbol id="i-steps" viewBox="0 0 24 24"><path d="M3.5 6.5l1.7 1.7 3-3.2M3.5 12.5l1.7 1.7 3-3.2"/><circle cx="5.5" cy="18.5" r="1.7"/><path d="M11.5 7h9M11.5 13h9M11.5 18.5h9"/></symbol>
 </svg>
@@ -435,6 +446,7 @@ body.lv-mode .lvwrap .meter { height: 10px; }
     <div class="s-row">
       <button id="sCard" class="btn glass" type="button"><svg class="ic" aria-hidden="true"><use href="#i-card"/></svg>Card</button>
       <button id="sSign" class="btn glass" type="button"><svg class="ic" aria-hidden="true"><use href="#i-sign"/></svg>Sign</button>
+      <button id="sRec" class="btn glass" type="button"><svg class="ic" aria-hidden="true"><use href="#i-rec"/></svg><span id="sRecText">Record</span></button>
       <button id="stop" class="btn strong hold" type="button"><svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="track" cx="12" cy="12" r="9"/><circle class="fill" cx="12" cy="12" r="9" pathLength="100"/></svg><span id="stopText">Hold to pause</span></button>
       <button id="endSession" class="btn glass" type="button" hidden>End session</button>
     </div>
@@ -569,6 +581,9 @@ body.lv-mode .lvwrap .meter { height: 10px; }
 <div id="endPanel" class="sheet paged" role="dialog" aria-modal="true" aria-labelledby="endTitle" hidden>
   <div class="sheet-head"><h2 id="endTitle">Session done</h2><button id="endClose" class="round" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
   <div class="group" id="endStats"></div>
+  <h3 class="cap" id="capRecs" hidden>Recordings</h3>
+  <div class="group recs" id="endRecs" hidden></div>
+  <p class="hint" id="recsHint" hidden>Recordings stay on this device, and a backup file doesn't include them. Save the ones you want to keep.</p>
   <h3 class="cap" id="capMood">How did it go?</h3>
   <div class="seg" id="moodSeg" role="radiogroup" aria-labelledby="capMood"></div>
   <textarea id="endNote" class="field area" maxlength="300" placeholder="A note for yourself (optional)" aria-label="A note for yourself"></textarea>
@@ -605,9 +620,10 @@ body.lv-mode .lvwrap .meter { height: 10px; }
   <div class="sheet-head"><h2 id="timerTitle">Session length</h2><button id="timerClose" class="round" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
   <div class="group">
     <div class="row full"><div class="seg" id="presets" role="radiogroup" aria-label="Session length"></div></div>
-    <div class="row"><span class="rt" id="minsLabel">Minutes</span><div class="stp" role="group" aria-labelledby="minsLabel"><button id="minsDown" type="button" aria-label="Fewer minutes">−</button><output id="minsOut">30</output><button id="minsUp" type="button" aria-label="More minutes">+</button></div></div>
+    <div class="row"><span class="rt" id="minsLabel">Length</span><div class="stp" role="group" aria-labelledby="minsLabel"><button id="minsDown" type="button" aria-label="Shorter">−</button><output id="minsOut">30</output><button id="minsUp" type="button" aria-label="Longer">+</button></div></div>
     <div class="row"><label class="rt" for="until">Until a time</label><button id="clearUntil" class="btn plain" type="button" hidden>Clear</button><input id="until" class="field" type="time"></div>
   </div>
+  <p class="hint">Up to 16 hours. Samt has to stay open with the screen on, so plug in for a long session.</p>
   <div class="actions"><button id="timerDone" class="btn strong" type="button">Done</button></div>
 </div>
 
@@ -703,6 +719,7 @@ body.lv-mode .lvwrap .meter { height: 10px; }
   </div>
   <input id="restoreFile" type="file" accept="application/json,.json" hidden>
   <p class="hint">Safari can clear a website's data if you don't open it for a week. Keep a backup file, or add Samt to your Home Screen (Share, then Add to Home Screen).</p>
+  <p class="hint">A backup file has your setup and past sessions, not their recordings. Save a recording you want to keep from its session in Past sessions.</p>
   <p class="hint" id="storeWarn" hidden>This browser won't keep Samt's setup (Private Browsing or blocked storage), so it will be lost when you close the page.</p>
   <div class="actions"><button id="dataDone" class="btn strong" type="button">Done</button></div>
 </div>
@@ -715,7 +732,7 @@ body.lv-mode .lvwrap .meter { height: 10px; }
     <a class="row" href="../"><span class="rt">Light and Neural</span><span class="rv">{{TIER}}</span><svg class="ic chev"><use href="#i-chev"/></svg></a>
   </div>
   <p class="hint">Wear headphones, or the speaker feeds back into the mic. Keep Samt open and in front while it runs; iPadOS stops the mic in the background. Don't use it at the ramp or jetbridge, or while driving.</p>
-  <p class="hint">Your voice, the audio and your setup stay on this device, saved in this browser only. When you ask Claude for a summary, that session's numbers, your mood and your note are sent to Claude, and nothing else.</p>
+  <p class="hint">Your voice, your recordings and your setup stay on this device, saved in this browser only. When you ask Claude for a summary, that session's numbers, your mood and your note are sent to Claude, and nothing else.</p>
   {{FOOT_EXTRA}}
   <div class="actions"><button id="aboutDone" class="btn strong" type="button">Done</button></div>
 </div>

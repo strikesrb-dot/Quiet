@@ -17,17 +17,19 @@ How it is laid out, by stage (Home shows only what fits where you are):
 
 - **Before your voice is taught**, Home offers one thing: Set up Samt, four steps one at a time (see below). Sessions
   open after the first step. Cards, the sign and reminders work from the start.
-- **Ready.** Home has the session length (tap the time), Silence or Conversation, Your voice or Sound level, Start, a
+- **Ready.** Home has the session length (tap the time: 30 minutes to 16 hours; − and + move 5 minutes under an
+  hour, 15 up to 4 hours, then an hour; or "Until a time", up to 16 hours away), Silence or Conversation, Your voice or Sound level, Start, a
   test without echo, and today's talk time; then three quick tools (Card, Sign, Reminders) and two rows, Progress and
   Settings.
 - **In a session** the screen shows only the session: Your voice or Sound level (one tap switches, and the session
   keeps its numbers), time left, the "Quiet for" timer, the live pill (with Sound level, − and + beside it move the line
-  on the level bar), a reminder, Talk freely, Card, Sign, and the main button: a 2-second hold pauses the session for
+  on the level bar), a reminder, Talk freely, Card, Sign, Record, and the main button: a 2-second hold pauses the session for
   up to 60 seconds (the echo stops, the mic's sound is set aside and the clock stands still; the pill counts down "Echo
   back in 0:45", then the echo is back by itself); Resume ends the pause early and End session finishes the session; a
   test stops with a tap. A call or Siri pauses it too, until you tap Resume. Details (the numbers, a correction for the last verdict with Your voice, echo
   volume, muted sounds) opens as a sheet. The browser's Back can't leave a running session.
-- **Afterwards**, the end sheet: the numbers, a mood, a note, and Claude's summary if you ask for it.
+- **Afterwards**, the end sheet: the numbers, the session's recordings, a mood, a note, and Claude's summary if you
+  ask for it.
 - **Progress**: today against the daily talk budget, days within it, the last 7 days as a chart, past sessions.
   Light and Neural on one device share these.
 - **Settings** is a short index (step-by-step setup, your voice, other voices; conversation, echo, matching, muted
@@ -40,6 +42,30 @@ you 20 seconds without the echo (each tap adds 20, up to 60; the pill counts dow
 within 10 minutes turn it off for an hour, on this device in Light and Neural alike (`samt.shared`: `freeTaps`,
 `freeLock`), so ending a session doesn't reset it. Phrases that pass (v1 to v6) are gone: with Your voice, replies
 under half a second still never echo.
+
+## Recording
+
+**Record** (in the session, beside Card and Sign) records the mic only, you and anyone near you, never the echo. Tap
+it again to stop; a session can have several recordings, a test none. Where the browser has MediaRecorder (Safari on
+iPhone and iPad, Chrome) it records the mic's own stream at 32 kbps (AAC in .m4a on iPhone: about 15 MB an hour, if
+Safari keeps to the asked-for rate); without it, Samt builds 16 kHz WAV from the audio the listener gets (about 115 MB
+an hour). Parts are written every 10 seconds to their own IndexedDB database (`samt-rec`, keys `<clip>:<part>`, no
+copy in memory), so a closed tab loses 10 seconds at most, and the session is listed with its recording as soon as it
+starts. A held pause doesn't stop a recording (the mic stays on); a call, Siri or the screen locking does, and keeps
+what it got. A recording under a second isn't kept. Before starting, Samt checks there are 25 MB free. A long recording
+goes on in a new file every hour (or every 60 MB), so each one stays small enough to put together, play and save; the
+echo stays as it was. Ending the session waits for a recording being put away, so its listing always has the last part.
+
+While a recording runs, Talk freely's button becomes **Turn the echo off / Turn the echo back on**, with no 20-second
+or hourly limit: no echo and no nudges, and your talk still counts (it's a Talk freely with no end that isn't counted
+as a tap). Stopping the recording brings the echo back.
+
+Afterwards the session's sheet (at the end, and from Past sessions, where it's marked "Recorded") lists its
+recordings: Play, Save (a file named `samt-YYYY-MM-DD-HHMM.m4a`, `.webm` or `.wav`) and Delete. A session with a
+recording is kept however short it is. Deleting a session, or clearing the past sessions, deletes its recordings.
+Backup files carry the list of recordings, not the audio. Past sessions shows the 30 newest and any older session that
+still has recordings, and the 500 sessions kept never drop one with recordings. Parts that no session lists (a tab
+closed at the wrong moment, a session deleted on another page) are removed a day later.
 
 ## Sound level
 
