@@ -29,8 +29,12 @@ node tests/live.js                       # after a deploy: live bytes = site/, f
   from a real stream (a 220 Hz tone from the fake mic), the path iPhone takes with AAC. It checks Record in the session
   row, the echo switch (no echo or chime while off, echoes again when back on), a too-short recording, recording
   through a held pause, a call cutting one off, the timer ending a session mid-recording (a 9-second session kept for
-  its recording), the sheet (play decodes to the recorded length, Save names the file for the day and time, Delete
-  removes its parts), a reload, Past sessions' "Recorded", deleting a session, and the clean-up of unlisted parts.
+  its recording), stopping a recording and ending the session at once (the listing still complete), the sheet (play
+  decodes to the recorded length, Save names the file for the day and time, Delete removes its parts), Talk freely's
+  time given back after the echo goes off and on, a long recording rolling on into new files (every 3 s in the test)
+  with the echo staying off, a short session whose only recording was too short leaving the list, a reload, Past
+  sessions' "Recorded", deleting a session, the clean-up of unlisted parts, and the list rules (524 sessions: 31
+  shown, the old one with recordings among them; trimmed to 500 without losing it).
   `features.js` checks the timer: presets 30 min to 16 hr, the − / + steps, "Until a time" 20 hours away held to 16,
   and 16:00:00 fitting at 390 px.
 - Screenshots and backup files go to `tests/out/` (ignored by git).

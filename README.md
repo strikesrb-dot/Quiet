@@ -52,7 +52,9 @@ Safari keeps to the asked-for rate); without it, Samt builds 16 kHz WAV from the
 an hour). Parts are written every 10 seconds to their own IndexedDB database (`samt-rec`, keys `<clip>:<part>`, no
 copy in memory), so a closed tab loses 10 seconds at most, and the session is listed with its recording as soon as it
 starts. A held pause doesn't stop a recording (the mic stays on); a call, Siri or the screen locking does, and keeps
-what it got. A recording under a second isn't kept. Before starting, Samt checks there are 25 MB free.
+what it got. A recording under a second isn't kept. Before starting, Samt checks there are 25 MB free. A long recording
+goes on in a new file every hour (or every 60 MB), so each one stays small enough to put together, play and save; the
+echo stays as it was. Ending the session waits for a recording being put away, so its listing always has the last part.
 
 While a recording runs, Talk freely's button becomes **Turn the echo off / Turn the echo back on**, with no 20-second
 or hourly limit: no echo and no nudges, and your talk still counts (it's a Talk freely with no end that isn't counted
@@ -61,8 +63,9 @@ as a tap). Stopping the recording brings the echo back.
 Afterwards the session's sheet (at the end, and from Past sessions, where it's marked "Recorded") lists its
 recordings: Play, Save (a file named `samt-YYYY-MM-DD-HHMM.m4a`, `.webm` or `.wav`) and Delete. A session with a
 recording is kept however short it is. Deleting a session, or clearing the past sessions, deletes its recordings.
-Backup files carry the list of recordings, not the audio. Parts that no session lists (say, a session dropped from
-the 500 kept) are removed a day later.
+Backup files carry the list of recordings, not the audio. Past sessions shows the 30 newest and any older session that
+still has recordings, and the 500 sessions kept never drop one with recordings. Parts that no session lists (a tab
+closed at the wrong moment, a session deleted on another page) are removed a day later.
 
 ## Sound level
 

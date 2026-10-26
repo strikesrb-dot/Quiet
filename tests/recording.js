@@ -120,17 +120,22 @@ let fails = 0; const ok = (c, s) => { console.log(`[${engine} ${mode}] ${c ? 'PA
       return { rec: b.scrollWidth <= b.clientWidth + 1, clock: r.scrollWidth <= r.clientWidth + 1, h: document.documentElement.scrollHeight, ih: innerHeight }; });
     await shot('session_rec_390');
     ok(fit.rec && fit.clock && (await overflow()) <= 0 && fit.h <= fit.ih + 1, `390px while recording: Record fits ${fit.rec}, clock fits ${fit.clock}, overflow ${await overflow()}px, page ${fit.h}px of ${fit.ih}`);
-    await feed('phr_hi'); await stopRec();
+    await feed('phr_hi');
     await page.setViewportSize({ width: 1024, height: 1366 }); await sleep(300);
-    s = await sess();
-    const ids = s.clips.map(c => c.id), recId = s.recId;
-    out('clips: ' + s.clips.map(c => `${c.id} ${c.dur}s ${c.bytes}B`).join(' · '));
-
-    // end the session: its sheet lists the recordings
-    await hold('#stop'); await sleep(200); await page.click('#endSession');
-    await page.waitForSelector('#endPanel.show', { timeout: 8000 }); await sleep(300);
+    // stop the recording and end the session at once (a held pause shows both): ending waits for the recording's last
+    // part, so the listing is complete
+    await hold('#stop'); await sleep(200);
+    const recId = (await sess()).recId;
+    await page.click('#sRec'); await page.click('#endSession');
+    await page.waitForSelector('#endPanel.show', { timeout: 10000 }); await sleep(300);
+    const hEnd = await page.evaluate(id => SamtDebug.history().find(r => r.id === id), recId);
+    s = { clips: hEnd ? hEnd.clips : [] };
+    const ids = s.clips.map(c => c.id), last = s.clips[3];
+    out('clips: ' + s.clips.map(c => `${c.id} ${c.dur}s ${c.bytes}B${c.done ? '' : ' (not done)'}`).join(' · '));
+    ok(s.clips.length === 4 && s.clips.every(c => c.done) && last && last.parts >= 1 && (await parts(last.id)) === last.parts,
+      `Record then End session at once: the last recording is complete in the listing (${last && last.dur} s, ${last && last.parts} part(s))`);
     let er = await endSheetRecs();
-    ok(er.length === 4 && await page.isVisible('#capRecs') && await page.isVisible('#recsHint') && /^Recording 1/.test(er[0]), 'end sheet, Recordings: ' + er.join(' | '));
+    ok(er.length === 4 && await page.isVisible('#capRecs') && await page.isVisible('#recsHint') && /^Recording 1/.test(er[0]) && !er.some(t => /isn't on this device/.test(t)), 'end sheet, Recordings: ' + er.join(' | '));
     await shot('end_recs_1024');
     // play: the audio is put together from its parts and has the length recorded
     await page.click('#endRecs .row.btns >> nth=0 >> text=Play');
@@ -172,14 +177,47 @@ let fails = 0; const ok = (c, s) => { console.log(`[${engine} ${mode}] ${c ? 'PA
       `timer ended it while recording: a ${hs && hs.dur} s session kept with its ${hs && hs.clips && hs.clips[0].dur} s recording`);
     await page.click('#endDone'); await page.waitForSelector('#endPanel', { state: 'hidden' });
 
+    // 6. Talk freely's time comes back when the echo is turned off and on again; a long recording rolls on into a new
+    //    file each hour (here every 3 s) and the echo stays off through it
+    await page.click('#go'); await page.waitForSelector('#vSession:not([hidden])'); await sleep(300);
+    const rollId = await page.evaluate(() => SamtDebug.session().recId);
+    await page.click('#pass'); await sleep(100); // Talk freely, 20 s
+    await page.click('#sRec'); await page.waitForFunction(() => !!SamtDebug.tape(), null, { timeout: 5000 });
+    await page.click('#pass'); await sleep(100); await page.click('#pass'); await sleep(150); // echo off, then on
+    const back = await page.evaluate(() => ({ left: SamtDebug.ctrl.passLeft(), pill: document.querySelector('#liveText').textContent }));
+    ok(back.left > 10 && back.left <= 20 && /^Echo back in/.test(back.pill), `echo off and on again: Talk freely's ${back.left.toFixed(1)} s are back ("${back.pill}")`);
+    await page.click('#pass'); await sleep(100); // echo off for a long one
+    await page.evaluate(() => SamtDebug.roll(3));
+    await feed('enroll_oth'); await sleep(mr ? 2500 : 300);
+    const rl = await page.evaluate(() => ({ n: SamtDebug.session().clips.length, off: SamtDebug.session().echoOff, btn: document.querySelector('#pass').textContent }));
+    ok(rl.n >= 2 && rl.off && rl.btn === 'Turn the echo back on', `a long recording rolled on into ${rl.n} files; the echo stayed off ("${rl.btn}")`);
+    await page.evaluate(() => SamtDebug.roll(3600)); await stopRec();
+    ok(!(await sess()).echoOff, 'stopping it turns the echo back on');
+    await hold('#stop'); await sleep(200); await page.click('#endSession');
+    await page.waitForSelector('#endPanel.show', { timeout: 10000 }); await sleep(300);
+    const rr = await endSheetRecs(), hr = await page.evaluate(id => SamtDebug.history().find(r => r.id === id), rollId);
+    ok(hr && hr.clips.length >= 2 && rr.length === hr.clips.length && hr.clips.every(c => c.done && c.dur >= 1), `its sheet lists the ${rr.length} files: ` + rr.join(' | '));
+    await page.click('#endDone'); await page.waitForSelector('#endPanel', { state: 'hidden' });
+
+    // 7. a short session whose only recording was too short isn't kept: it leaves the list it joined when recording began
+    await page.click('#go'); await page.waitForSelector('#vSession:not([hidden])'); await sleep(300);
+    const gone = await page.evaluate(() => SamtDebug.session().recId);
+    await page.click('#sRec'); await page.waitForFunction(() => !!SamtDebug.tape(), null, { timeout: 5000 });
+    const listedEarly = await page.waitForFunction(id => SamtDebug.history().some(r => r.id === id), gone, { timeout: 5000 }).then(() => true, () => false);
+    await sleep(100); await stopRec();
+    await hold('#stop'); await sleep(200); await page.click('#endSession'); await sleep(1200);
+    const still = await page.evaluate(id => SamtDebug.history().some(r => r.id === id), gone);
+    ok(listedEarly && !still && await page.isHidden('#endPanel'), `a short session with only a too-short recording: listed while recording (${listedEarly}), then gone (${!still}), no end sheet`);
+    await page.waitForSelector('#vHome:not([hidden])', { timeout: 5000 });
+
     // past sessions mark the recorded ones; after a reload the recordings are still there and play
     await page.reload(); await ready(); await sleep(600);
     const h1 = await page.evaluate(() => SamtDebug.history());
-    ok(h1.length === h0 + 2 && h1.filter(r => r.clips && r.clips.length).length === 2, `after a reload: ${h1.length} sessions, ${h1.filter(r => r.clips && r.clips.length).length} with recordings`);
+    ok(h1.length === h0 + 3 && h1.filter(r => r.clips && r.clips.length).length === 3, `after a reload: ${h1.length} sessions, ${h1.filter(r => r.clips && r.clips.length).length} with recordings`);
     await page.click('#toProgress'); await page.waitForSelector('#vProgress:not([hidden])'); await sleep(300);
     const rows = await page.$$eval('#histList .row:not(.danger)', rs => rs.map(r => r.textContent));
-    ok(rows.length >= 2 && /Recorded/.test(rows[0]) && /Recorded/.test(rows[1]), 'past sessions: ' + rows.slice(0, 2).join(' | '));
-    await page.click('#histList .row:not(.danger) >> nth=1'); await page.waitForSelector('#endPanel.show'); await sleep(300);
+    ok(rows.length >= 3 && rows.slice(0, 3).every(r => /Recorded/.test(r)), 'past sessions: ' + rows.slice(0, 3).join(' | '));
+    await page.click('#histList .row:not(.danger) >> nth=2'); await page.waitForSelector('#endPanel.show'); await sleep(300);
     er = await endSheetRecs();
     await page.click('#endRecs .row.btns >> nth=0 >> text=Play'); await page.waitForSelector('#endRecs audio', { timeout: 5000 });
     const pl2 = await page.evaluate(async () => { const a = document.querySelector('#endRecs audio'); return (await (await fetch(a.src)).arrayBuffer()).byteLength; });
@@ -187,7 +225,7 @@ let fails = 0; const ok = (c, s) => { console.log(`[${engine} ${mode}] ${c ? 'PA
     await page.click('#endDone'); await page.waitForSelector('#endPanel', { state: 'hidden' });
 
     // deleting a session deletes its recordings
-    await page.click('#histList .row:not(.danger) >> nth=1'); await page.waitForSelector('#endPanel.show');
+    await page.click('#histList .row:not(.danger) >> nth=2'); await page.waitForSelector('#endPanel.show');
     await page.click('#endDelete'); await page.waitForSelector('#actSheet.show');
     const msg = await page.textContent('#actMsg');
     await page.click('#actRows .row.danger'); await sleep(800);
@@ -203,6 +241,24 @@ let fails = 0; const ok = (c, s) => { console.log(`[${engine} ${mode}] ${c ? 'PA
       return { old: await B.count(old), fresh: await B.count(fresh), listed: await B.count(listed) };
     });
     ok(sw.old === 0 && sw.fresh === 1 && sw.listed >= 1, `clean-up: an unlisted 3-day-old recording removed (${sw.old}), a new one kept (${sw.fresh}), a listed one kept (${sw.listed})`);
+
+    // past sessions: the 30 newest are shown, plus any older one that still has recordings; and the 500 kept never
+    // drop one with recordings (its audio would go with it)
+    const total = await page.evaluate(async () => {
+      const h = SamtDebug.history().slice(), now = Date.now(), recd = h.find(r => r.clips && r.clips.length);
+      const fake = []; for (let i = 0; i < 520; i++) fake.push({ id: 'sfake' + i, at: now - (600 - i) * 3600000, dur: 60, talkTime: 0, kind: 'silence', page: 'light' });
+      const all = [Object.assign({}, recd, { id: 'sold', at: now - 900 * 3600000 })].concat(fake, h);
+      await new Promise((res, rej) => { const r = indexedDB.open('samt', 1); r.onerror = () => rej(r.error);
+        r.onsuccess = () => { const t = r.result.transaction('kv', 'readwrite'); t.objectStore('kv').put(all, 'shared:history'); t.oncomplete = () => { r.result.close(); res(); }; t.onerror = () => rej(t.error); }; });
+      return all.length;
+    });
+    await page.reload(); await ready(); await sleep(600);
+    await page.click('#toProgress'); await page.waitForSelector('#vProgress:not([hidden])'); await sleep(300);
+    const lr = await page.$$eval('#histList .row:not(.danger)', rs => rs.map(r => r.textContent));
+    ok(lr.length === 31 && /Recorded/.test(lr[30]), `${total} past sessions: ${lr.length} shown, the last an old one with recordings ("${(lr[30] || '').slice(0, 60)}")`);
+    await page.click('#histList .row:not(.danger) >> nth=0'); await page.waitForSelector('#endPanel.show'); await page.click('#endDone'); await sleep(600); // saving it trims the list
+    const kept = await page.evaluate(() => ({ n: SamtDebug.history().length, old: SamtDebug.history().some(r => r.id === 'sold'), fake0: SamtDebug.history().some(r => r.id === 'sfake0') }));
+    ok(kept.n === 500 && kept.old && !kept.fake0, `trimmed to ${kept.n}: the oldest, with recordings, stays (${kept.old}); the oldest without goes (${!kept.fake0})`);
   } catch (e) { ok(false, 'ERROR ' + (e.stack || e).toString().slice(0, 700)); }
   ok(!errs.length, 'page errors: ' + (errs.join(' | ') || 'none'));
   console.log(fails ? `${fails} FAILED` : 'ALL PASS');

@@ -256,9 +256,11 @@
     await loadHistory();
     const i = history.findIndex(r => r.id === rec.id);
     if (i >= 0) history[i] = Object.assign({}, history[i], rec); else history.push(rec);
-    history.sort((a, b) => a.at - b.at); if (history.length > 500) history = history.slice(-500);
+    history.sort((a, b) => a.at - b.at); history = capHistory(history);
     await store.set('shared:history', history);
   }
+  /* The 500 newest sessions, and any older one that still has recordings (its audio would be lost with it). */
+  function capHistory(h) { let drop = h.length - 500; return drop > 0 ? h.filter(r => { if (drop > 0 && !(r.clips && r.clips.length)) { drop--; return false; } return true; }) : h; }
   async function dropRecord(id) { await loadHistory(); history = history.filter(r => r.id !== id); await store.set('shared:history', history); }
   function backup() {
     // phrases: none recorded; the field is there only so a v6 page (which expects it) can still restore this file
@@ -288,7 +290,7 @@
       if (Array.isArray(d.history)) {
         await loadHistory(); const ids = new Set(history.map(r => r.id));
         for (const r of d.history) if (r && typeof r.id === 'string' && +r.at > 0 && !ids.has(r.id)) history.push(r);
-        history.sort((a, b) => a.at - b.at); history = history.slice(-500); await store.set('shared:history', history);
+        history.sort((a, b) => a.at - b.at); history = capHistory(history); await store.set('shared:history', history);
       }
       await saveAll(); render(); renderHistory(); renderToday(); toast('Setup restored.');
     } catch (e) { note(e.message || "Couldn't read that file."); }
@@ -671,7 +673,7 @@
     const c = ctrl.counts;
     const out = { id: s.recId, at: s.startedAt, dur: FAKE ? Math.round((s.fakeSec || 0) + listener.fs.nFrames / 100) : Math.round(activeMs(s) / 1000), page: MODE, kind: s.kind, who: s.usedLevel ? 'level' : 'voice', talkTime: +c.talkTime.toFixed(2), meSec: +c.meSec.toFixed(2), otherSec: +c.otherSec.toFixed(2),
       talks: c.talk, interrupts: c.interrupt, nudges: c.nudge, freePass: c.freePass, shorts: c.short, others: c.other, bestQuiet: Math.round(s.bestQuiet) };
-    if (s.clips && s.clips.length) out.clips = s.clips.map(x => Object.assign({}, x)); // its recordings (the audio is in blobs)
+    if (s.clipN) out.clips = (s.clips || []).map(x => Object.assign({}, x)); // its recordings (the audio is in blobs); [] once the only one was dropped
     return out;
   }
   function tickSession() {
@@ -685,7 +687,7 @@
     }
     if (session.endAt) { const left = (session.endAt - sessionNow(session)) / 1000; setReadout($('sReadout'), left); if (left <= 0 && !session.paused && !session.stopping) { stopSession(true); return; } }
     else setReadout($('sReadout'), activeMs(session) / 1000);
-    if (tape) { const sec = tape.r.sec(); tape.clip.dur = Math.round(sec); $('sRecText').textContent = clock(sec); }
+    if (tape) { const sec = tape.r.sec(); tape.clip.dur = Math.round(sec); $('sRecText').textContent = clock(sec); if (!tape.rolling && (sec >= ROLL_SEC || tape.clip.bytes >= ROLL_BYTES)) rollTape(); }
     if (!ctrl || session.paused) return;
     // the quiet timer: since your last words (or since the start)
     const g = ctrl.seg, talking = ctrl.talking ? ctrl.talking() : !!(g && g.speaker === 'me');
@@ -695,7 +697,7 @@
     // talk freely: the time until the echo is back on the pill; on the button, adding 20 s and how many taps are left,
     // or when Talk freely is back
     const left = ctrl.passLeft(), fs = freeState();
-    if (tape) { $('pass').textContent = session.echoOff ? 'Turn the echo back on' : 'Turn the echo off'; $('pass').disabled = false; } // while recording: no limit
+    if (tape || session.echoOff) { $('pass').textContent = session.echoOff ? 'Turn the echo back on' : 'Turn the echo off'; $('pass').disabled = false; } // while recording: no limit
     else {
       $('pass').textContent = fs.locked ? `Talk freely in ${clock(fs.lockLeft)}`
         : (left > 0 ? `Add ${FREE_SEC} s` : `Talk freely, ${FREE_SEC} s`) + (fs.left < FREE_TAPS ? ` · ${fs.left} left` : '');
@@ -708,7 +710,7 @@
     if (session.mode === 'test') return;
     const now = Date.now();
     if (now - session.uiAt >= 1000) { session.uiAt = now; renderToday(true); budgetWarn(); }
-    if (now - session.savedAt >= 30000) { session.savedAt = now; const s = sessionSnap(); if (s) putRecord(Object.assign(s, { open: true })).catch(() => {}); } // in case the tab is closed
+    if (now - session.savedAt >= 30000) { session.savedAt = now; listNow(session); } // in case the tab is closed
   }
   function budgetWarn() {
     const m = dayTotals(), t = (m.get(dayKey(Date.now())) || { talk: 0 }).talk, bud = shared.budget * 60;
@@ -717,10 +719,10 @@
   }
   async function stopSession(finished) {
     if (!session || session.stopping) return;
-    if (tape) { session.stopping = true; render(); await endTape('end'); if (!session) return; } // its last part first
+    if (tape || tapeEnd) { session.stopping = true; render(); try { await (tape ? endTape('end') : tapeEnd); } catch (e) {} if (!session) return; } // the recording's last part first
     if (ctrl && ctrl.seg) { try { ctrl.cut(); } catch (e) {} } // count the words still in progress
     if (capture && capture.inSession) cancelMute(''); // the session's mic is about to stop
-    const snap = sessionSnap(), adaptQ = session.adaptQ.concat(ctrl && ctrl.adaptQueue ? ctrl.adaptQueue : []); // Sound level adds none
+    const snap = sessionSnap(), adaptQ = session.adaptQ.concat(ctrl && ctrl.adaptQueue ? ctrl.adaptQueue : []), listed = !!session.listed; // Sound level adds no adaptQ
     clearInterval(session.timer); session = null;
     if (ctrl) ctrl.stop(); gateTap = null; syncWho();
     releaseMic(); if (!showCtx) releaseWake();
@@ -729,12 +731,13 @@
     refreshReadout(); setBusy(null);
     live(finished ? 'done' : 'off', finished ? `Done. You talked ${c.talk} time${c.talk === 1 ? '' : 's'}.` : 'Stopped');
     // keep the session (30 seconds or longer, or with a recording) and open its summary
-    if (snap && (snap.dur >= 30 || snap.clips)) {
+    if (snap && (snap.dur >= 30 || (snap.clips && snap.clips.length))) {
       snap.open = false;
       try { await putRecord(snap); } catch (e) {}
       renderHistory(); renderToday();
       openEnd(history.find(r => r.id === snap.id) || snap, false);
     }
+    else if (snap && listed) { try { await dropRecord(snap.id); } catch (e) {} renderHistory(); renderToday(); } // listed early, but too short to keep
     // keep learning: speech that was confidently you, plus any That was me / Not me from this session
     const q = adaptQ, fixes = pendingFixes.splice(0);
     if ((q.length || fixes.length) && voice) {
@@ -786,64 +789,95 @@
   }
   /* ---------- recording a session: the mic only (you and anyone near you), never the echo; kept on this device ---------- */
   const ECHO_OFF_SEC = 24 * 3600; // "echo off" is a Talk freely with no end that isn't counted as a tap
-  async function startTape() {
-    if (!session || session.mode === 'test' || tape || tapeWait || session.stopping) return;
-    if (session.paused && !session.holdPause) { toast('Tap Resume first.'); return; }
+  let ROLL_SEC = 3600, ROLL_BYTES = 60e6; // a long recording carries on in a new file each hour (or 60 MB): each stays easy to play and save
+  let tapeEnd = null; // a recording being put away: ending the session waits for it
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  async function startTape(roll) {
+    if (!session || session.mode === 'test' || tape || tapeWait || tapeEnd || session.stopping) return;
+    if (session.paused && !session.holdPause) { if (!roll) toast('Tap Resume first.'); return; }
     const stream = mic.recStream ? mic.recStream() : null; // inside the tap
     tapeWait = true; render();
     try {
       let room = Infinity;
-      try { const e = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null; if (e && e.quota) room = e.quota - (e.usage || 0); } catch (e) {}
-      if (room < 25e6) { toast('Not enough room on this device to record.'); return; }
+      try { const e = navigator.storage && navigator.storage.estimate ? await Promise.race([navigator.storage.estimate(), wait(2000).then(() => null)]) : null; if (e && e.quota) room = e.quota - (e.usage || 0); } catch (e) {}
+      if (room < 25e6) { toast(roll ? 'This device is nearly out of room, so the recording stopped.' : 'Not enough room on this device to record.'); return; }
       const s = session; if (!s || s.stopping || tape || (s.paused && !s.holdPause)) return;
-      const t = { r: null, clip: null, chain: Promise.resolve(), n: 0, failed: null };
+      const t = { r: null, clip: null, recId: s.recId, chain: Promise.resolve(), n: 0, failed: null, ended: false, settled: false, dropped: false };
       const opts = { onPart: d => keepPart(t, d), onEnd: () => { if (tape === t) endTape('cut'); } };
       try { t.r = new S.mic.Recorder(stream, opts); } catch (e) { t.r = new S.mic.Recorder(null, opts); } // MediaRecorder said no: WAV
       s.clipN = (s.clipN || 0) + 1; // a clip's id is never used twice, even after a too-short one is dropped
       t.clip = { id: `${s.recId}.${s.clipN}`, mime: t.r.mime, parts: 0, bytes: 0, dur: 0, at: Date.now(), done: false };
       (s.clips = s.clips || []).push(t.clip); tape = t;
-      const snap = sessionSnap(); if (snap) putRecord(Object.assign(snap, { open: true })).catch(() => {}); // listed at once, in case the tab closes
+      listNow(s); // listed at once, in case the tab closes
       try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
     } catch (e) { toast("Couldn't start recording on this device."); }
     finally { tapeWait = false; render(); if (session) tickSession(); }
   }
+  /* The running session as it stands, into the past-sessions list (marked open), in case the tab is closed. */
+  function listNow(s) { if (!s || s !== session || s.stopping) return; const snap = sessionSnap(); if (snap) { s.listed = true; putRecord(Object.assign(snap, { open: true })).catch(() => {}); } }
   /* A part to disk, in order; if one can't be saved, the recording stops with what it has. */
   function keepPart(t, d) {
     const c = t.clip, key = `${c.id}:${String(t.n++).padStart(5, '0')}`;
     t.chain = t.chain.then(async () => {
-      if (t.failed) return;
+      if (t.failed || t.dropped) return;
       const buf = d instanceof ArrayBuffer ? d : await (d.arrayBuffer ? d.arrayBuffer() : new Response(d).arrayBuffer());
       await blobs.put(key, buf); c.parts++; c.bytes += buf.byteLength;
+      if (t.settled) saveClip(t); // it came in after the recording was put away (a slow browser): update the listing
     }).catch(e => { if (!t.failed) { t.failed = e || new Error('not saved'); if (tape === t) endTape(e && e.name === 'QuotaExceededError' ? 'full' : 'fail'); } });
   }
-  /* Stops the recording and keeps it (why: '' a tap, 'end' the session ended, 'cut' the mic stopped, 'full' / 'fail'
-     a part couldn't be saved). The echo comes back. */
-  async function endTape(why) {
-    const t = tape; if (!t) return;
-    tape = null;
-    if (session && session.echoOff) setEchoOff(false);
-    render();
-    try { await t.r.stop(); } catch (e) {}
-    try { await t.chain; } catch (e) {}
-    const c = t.clip, s = session && session.clips && session.clips.includes(c) ? session : null;
-    c.dur = Math.round(t.r.sec()); c.done = true;
-    const kept = c.parts > 0 && t.r.sec() >= 1;
-    if (!kept) { if (s) s.clips = s.clips.filter(x => x !== c); blobs.del(c.id).catch(() => {}); } // too short to keep
-    if (s && !s.stopping) { const snap = sessionSnap(); if (snap) putRecord(Object.assign(snap, { open: true })).catch(() => {}); }
-    render(); if (session) tickSession();
-    const say = { '': kept ? 'Recording saved. It shows with this session when the session ends.' : 'Too short to keep.',
-      cut: 'The mic stopped, so the recording did too. What it got is kept.',
-      full: 'This device is out of room, so the recording stopped. What it got is kept.',
-      fail: "Couldn't save the recording on this device, so it stopped." }[why];
-    if (say) toast(say);
+  /* A clip's latest numbers into its session's listing, once that session isn't running any more. */
+  async function saveClip(t) {
+    if (session && session.recId === t.recId && !session.stopping) return; // the running session's next save carries them
+    try {
+      await loadHistory(); const r = history.find(x => x.id === t.recId);
+      if (r && Array.isArray(r.clips) && r.clips.some(x => x.id === t.clip.id)) await putRecord({ id: r.id, at: r.at, clips: r.clips.map(x => x.id === t.clip.id ? Object.assign({}, t.clip) : x) });
+    } catch (e) {}
+  }
+  /* Stops the recording and keeps it (why: '' a tap, 'end' the session is ending, 'roll' going on in a new file, 'cut'
+     the mic stopped, 'full' / 'fail' a part couldn't be saved). The echo comes back, except when it rolls on. Ending the
+     session waits for this (tapeEnd), so the listing always has the recording's last part and length. */
+  function endTape(why) {
+    const t = tape; if (!t) return tapeEnd || Promise.resolve();
+    tape = null; t.ended = true;
+    const s = session;
+    if (why !== 'roll' && s && s.echoOff) setEchoOff(false);
+    const p = (async () => {
+      try { await t.r.stop(); } catch (e) {}
+      const settled = await Promise.race([t.chain.then(() => true, () => true), wait(8000).then(() => false)]);
+      const c = t.clip, sec = t.r.sec();
+      c.dur = Math.round(sec); c.done = true;
+      // kept unless it's under a second, or the browser said it was done and nothing came (if it didn't say, parts may still come)
+      const kept = sec >= 1 && (c.parts > 0 || !t.r.confirmed || !settled);
+      if (!kept) { t.dropped = true; if (s && s.clips) s.clips = s.clips.filter(x => x !== c); blobs.del(c.id).catch(() => {}); }
+      t.settled = true;
+      listNow(s);
+      if (s && s === session) tickSession();
+      const say = { '': kept ? 'Recording saved. It shows with this session when the session ends.' : 'Too short to keep.',
+        cut: 'The mic stopped, so the recording did too.' + (kept ? ' What it got is kept.' : ''),
+        full: 'This device is out of room, so the recording stopped.' + (kept ? ' What it got is kept.' : ''),
+        fail: "Couldn't save the recording on this device, so it stopped." }[why];
+      if (say) toast(say);
+      return kept;
+    })().finally(() => { if (tapeEnd === p) tapeEnd = null; render(); });
+    tapeEnd = p; render();
+    return p;
+  }
+  /* A long recording rolls on into a new file; the echo stays as it was. */
+  async function rollTape() {
+    const t = tape; if (!t || t.rolling) return; t.rolling = true;
+    await endTape('roll');
+    if (session && !session.stopping) await startTape(true);
+    if (!tape && session && session.echoOff) setEchoOff(false); // it couldn't go on: the echo comes back, as when a recording stops
   }
   /* While recording, Talk freely's button turns the echo off and on, with no limit: no echo and no nudges, and your
-     talk still counts. */
+     talk still counts. Turning it back on gives back any Talk freely time that was left. */
+  const frameNow = () => ctrl && ctrl.frameNow ? ctrl.frameNow() : listener.fs.nFrames;
   function setEchoOff(off) {
     if (!session || !ctrl || !!session.echoOff === !!off) return;
     session.echoOff = !!off;
-    ctrl.pass(off ? ECHO_OFF_SEC : 0, true);
-    if (!off && !session.paused) { session.passing = false; live('on', 'Listening'); }
+    if (off) { session.freeEnd = frameNow() + Math.round(ctrl.passLeft() * 100); ctrl.pass(ECHO_OFF_SEC, true); }
+    else { ctrl.pass(Math.max(0, ((session.freeEnd || 0) - frameNow()) / 100), true); session.freeEnd = 0; }
+    if (!off && !session.paused && !(ctrl.passLeft() > 0)) { session.passing = false; live('on', 'Listening'); }
     tickSession();
   }
   /* A session's recordings in its sheet: play, save to a file, delete. A clip is put together from its parts when asked. */
@@ -873,12 +907,14 @@
       row.append(t, v);
       const bar = document.createElement('div'); bar.className = 'row btns';
       const btn = (label, fn, cls) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn plain' + (cls ? ' ' + cls : ''); b.textContent = label; b.onclick = fn; bar.appendChild(b); return b; };
-      let url = null;
-      const ready = async () => { if (!url) { const b = await clipBlob(c); if (b) { url = URL.createObjectURL(b); recUrls.push(url); } } return url; };
+      let urlP = null;
+      const ready = () => urlP || (urlP = clipBlob(c).then(b => { if (!b) { urlP = null; return null; } const u = URL.createObjectURL(b); recUrls.push(u); asLink(u); return u; }, () => { urlP = null; return null; }));
+      // once the audio is put together, Save is a plain link to it, so a tap saves it straight away (iPhone wants the tap)
+      const asLink = u => { const a = document.createElement('a'); a.className = 'btn plain'; a.href = u; a.download = clipName(c); a.textContent = 'Save'; if (save.parentNode) save.replaceWith(a); };
       const missing = () => { s2.textContent = "This recording isn't on this device."; play.disabled = save.disabled = true; };
       const play = btn('Play', async () => {
         play.disabled = true;
-        const u = await ready().catch(() => null); if (!u) { missing(); return; }
+        const u = await ready(); if (!u) { missing(); return; }
         const a = document.createElement('audio'); a.controls = true; a.preload = 'metadata';
         const go = () => { a.play().catch(() => {}); };
         // a recording without a length in it (Chrome's): seek to the end once so the player can show one
@@ -891,8 +927,9 @@
         const p = document.createElement('div'); p.className = 'row player'; p.appendChild(a); bar.after(p); play.remove();
       });
       const save = btn('Save', async () => {
-        const u = await ready().catch(() => null); if (!u) { missing(); return; }
-        const a = document.createElement('a'); a.href = u; a.download = clipName(c); document.body.appendChild(a); a.click(); a.remove();
+        save.disabled = true; // one at a time
+        const u = await ready(); if (!u) { missing(); return; }
+        const link = bar.querySelector('a[download]'); if (link) link.click();
       });
       btn('Delete', () => ask({ title: 'Delete this recording?', msg: "It's deleted from this device. A copy you saved stays.", actions: [{ label: 'Delete', danger: true, run: () => deleteClip(r, c) }] }), 'danger');
       box.append(row, bar);
@@ -997,7 +1034,8 @@
   function renderHistory() {
     const box = $('histList'); box.textContent = '';
     const live = session && session.recId; // the session running now is not a past one yet
-    const list = history.filter(r => r.id !== live).sort((a, b) => b.at - a.at).slice(0, 30);
+    const all = history.filter(r => r.id !== live).sort((a, b) => b.at - a.at);
+    const list = all.slice(0, 30).concat(all.slice(30).filter(r => r.clips && r.clips.length)); // the 30 newest, and older ones with recordings
     if (!list.length) {
       box.innerHTML = '<div class="empty"><span class="tile soft" aria-hidden="true"><svg class="ic"><use href="#i-hush"/></svg></span><b>No sessions yet</b><span>Each session you finish shows here, with how much you talked.</span></div>';
       return;
@@ -1535,7 +1573,7 @@
     // the session view
     $('resume').hidden = !paused; $('pass').hidden = paused || test; $('stop').hidden = paused; $('endSession').hidden = !paused;
     $('sRec').hidden = test; $('sRec').classList.toggle('on', !!tape);
-    $('sRec').disabled = tapeWait || !!(session && (session.stopping || (paused && !session.holdPause && !tape)));
+    $('sRec').disabled = tapeWait || !!tapeEnd || !!(session && (session.stopping || (paused && !session.holdPause && !tape)));
     if (tape) $('sRec').setAttribute('aria-label', 'Stop recording'); else { $('sRec').removeAttribute('aria-label'); $('sRecText').textContent = 'Record'; }
     $('stopText').textContent = test ? 'Stop test' : 'Hold to pause'; $('stop').classList.toggle('hold', !test); $('stop').querySelector('.ring').style.display = test ? 'none' : '';
     $('sWhoSeg').querySelectorAll('button').forEach((b, i) => { b.disabled = paused || (i === 0 && !voiceUsable()); });
@@ -1608,7 +1646,7 @@
     // what turns the echo on: Your voice (the voice check) or Sound level (the line); on Home, and mid-session
     const WHO = [{ v: 'voice', label: 'Your voice' }, { v: 'level', label: 'Sound level' }];
     whoCtl = seg($('whoSeg'), WHO, settings.who, setWho); sWhoCtl = seg($('sWhoSeg'), WHO, settings.who, setWho);
-    $('pass').onclick = () => { if (tape) setEchoOff(!(session && session.echoOff)); else talkFreely(); }; // while recording: the echo switch
+    $('pass').onclick = () => { if (tape || (session && session.echoOff)) setEchoOff(!(session && session.echoOff)); else talkFreely(); }; // while recording: the echo switch
     $('sRec').onclick = () => { if (tape) endTape(''); else startTape(); };
     $('endSession').onclick = () => { if (session && session.paused) stopSession(false); };
     const applyConv = () => { if (ctrl && session && session.kind === 'conversation') Object.assign(ctrl.p, convParams()); render(); };
@@ -1705,7 +1743,7 @@
     setTimeout(() => { try { for (const f of ['"Amiri Quran"', 'Amiri', '"Samt Arabic"']) document.fonts.load('26px ' + f, 'ق').catch(() => {}); } catch (e) {} }, 2000);
     debug.history = () => history; debug.shared = shared; debug.view = () => view; debug.trouble = onTrouble;
     debug.wiz = () => ({ at: wizAt, states: WSTEPS.map(s => stepState(s.id)), check: wiz.check, done: wiz.done, strict: settings.strict, who: settings.who });
-    debug.session = () => session; debug.tick = () => tickSession(); debug.tape = () => tape; debug.blobs = blobs; debug.sweep = sweepTapes; // the tests move a pause's start back to reach its end
+    debug.session = () => session; debug.tick = () => tickSession(); debug.tape = () => tape; debug.blobs = blobs; debug.sweep = sweepTapes; debug.roll = (sec, bytes) => { ROLL_SEC = sec; if (bytes) ROLL_BYTES = bytes; }; // the tests move a pause's start back to reach its end
     debug.line = () => lineNow(); debug.setLine = setLine; debug.mutes = () => shared.mutes; debug.gate = () => gateTap;
     if (FAKE) { debug.feed = async (name, url) => { const b = await (await fetch(url)).arrayBuffer(); return mic.play(name, new Float32Array(b)); }; debug.ensureEngine = ensureMic; }
   }

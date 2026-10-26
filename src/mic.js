@@ -227,12 +227,12 @@ registerProcessor('samt-tap', SamtTap);
         try { mr = new MR(stream, Object.assign({ audioBitsPerSecond: 32000 }, type ? { mimeType: type } : {})); } catch (e) { mr = new MR(stream); }
         this.kind = 'mr'; this.mr = mr;
         this.mime = String(mr.mimeType || type || 'audio/mp4').split(';')[0].trim() || 'audio/mp4';
-        this.done = new Promise(res => { mr.onstop = () => { this._end(); res(); if (!this.asked) this.onEnd(); }; });
+        this.done = new Promise(res => { mr.onstop = () => { this.confirmed = true; this._end(); res(); if (!this.asked) this.onEnd(); }; }); // confirmed: every part has come
         mr.ondataavailable = e => { if (e.data && e.data.size) this.onPart(e.data); };
         mr.onerror = () => { try { if (mr.state !== 'inactive') mr.stop(); } catch (e) {} };
         mr.start(10000);
       } else {
-        this.kind = 'wav'; this.mime = 'audio/wav'; this.buf = new Int16Array(160000); this.n = 0; this.done = Promise.resolve();
+        this.kind = 'wav'; this.mime = 'audio/wav'; this.buf = new Int16Array(160000); this.n = 0; this.done = Promise.resolve(); this.confirmed = true;
       }
     }
     _end() { if (!this.over) { this.over = true; this.t1 = Date.now(); } }
@@ -277,7 +277,8 @@ registerProcessor('samt-tap', SamtTap);
       try {
         return await new Promise((res, rej) => {
           let t; try { t = db.transaction('parts', mode); } catch (e) { rej(e); return; }
-          const r = fn(t.objectStore('parts')); t.oncomplete = () => res(r && r.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error || new Error('aborted'));
+          const r = fn(t.objectStore('parts')); t.oncomplete = () => res(r && r.result);
+          t.onerror = ev => rej((ev && ev.target && ev.target.error) || t.error || new Error('IndexedDB error')); t.onabort = () => rej(t.error || new Error('aborted')); // a request's own error (QuotaExceededError): t.error is still null then
         });
       } catch (e) {
         if (retry && e && e.name === 'InvalidStateError') { dbp = null; return tx(mode, fn, false); } // Safari dropped the connection
