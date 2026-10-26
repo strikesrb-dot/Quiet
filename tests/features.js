@@ -56,6 +56,31 @@ let fails = 0; const ok = (c, s) => { console.log(`[${engine} ${mode}] ${c ? 'PA
     ok((await page.getAttribute('#swNudge', 'aria-checked')) === 'true' && (await page.getAttribute('#swInterrupt', 'aria-checked')) === 'true', 'switches on by default');
     await page.click('#convDone'); await page.waitForSelector('#convPanel', { state: 'hidden' });
     ok(/^5 s turns/.test(await page.textContent('#convLine')), 'line updated: ' + await page.textContent('#convLine'));
+    // the session's length: up to 16 hours; − / + move 5 minutes under an hour, 15 up to 4 hours, then an hour
+    await page.click('#readout'); await page.waitForSelector('#timerPanel.show');
+    const pre = await page.$$eval('#presets button', bs => bs.map(b => b.textContent));
+    ok(pre.join('|') === '30 min|1 hr|2 hr|8 hr|16 hr', 'timer presets: ' + pre.join(', '));
+    const lenSteps = async (seq) => { const got = []; for (const id of seq) { await page.click(id); got.push(await page.textContent('#minsOut')); } return got.join(', '); };
+    await page.click('#presets button:nth-of-type(5)');
+    const r16 = await page.evaluate(() => { const r = document.querySelector('#readout'); return { t: r.textContent, long: r.classList.contains('long'), fits: r.scrollWidth <= r.clientWidth + 1 }; });
+    const s16 = await lenSteps(['#minsUp', '#minsDown']);
+    ok(r16.t === '16:00:00' && r16.long && r16.fits && s16 === '16 hr, 15 hr', `16 hr: readout ${r16.t} (smaller size ${r16.long}, fits ${r16.fits}); + then −: ${s16}`);
+    await page.click('#presets button:nth-of-type(4)');
+    const s8 = await lenSteps(['#minsDown', '#minsDown', '#minsDown', '#minsDown', '#minsDown', '#minsUp', '#minsUp']);
+    ok(s8 === '7 hr, 6 hr, 5 hr, 4 hr, 3 hr 45 min, 4 hr, 5 hr', 'from 8 hr: ' + s8);
+    await page.click('#presets button:nth-of-type(2)');
+    const s1 = await lenSteps(['#minsDown', '#minsUp', '#minsUp']);
+    ok(s1 === '55 min, 1 hr, 1 hr 15 min' && (await page.textContent('#readout')) === '1:15:00', `from 1 hr: ${s1}; readout ${await page.textContent('#readout')}`);
+    const far = await page.evaluate(() => { const t = new Date(Date.now() + 20 * 3600000); return String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0'); });
+    await page.fill('#until', far); await page.dispatchEvent('#until', 'input'); await sleep(150);
+    ok((await page.textContent('#readout')) === '16:00:00' && /up to 16 hours/.test(await page.textContent('#toast')), `until ${far} (20 hours away): readout ${await page.textContent('#readout')}, "${await page.textContent('#toast')}"`);
+    await page.click('#clearUntil'); await page.click('#presets button:nth-of-type(5)');
+    await page.setViewportSize({ width: 390, height: 844 }); await sleep(300);
+    const fit390 = await page.evaluate(() => { const r = document.querySelector('#readout'); return r.scrollWidth <= r.clientWidth + 1 && document.documentElement.scrollWidth <= innerWidth; });
+    ok(fit390, '16:00:00 fits at 390px');
+    await page.setViewportSize({ width: 1024, height: 1366 }); await sleep(200);
+    await page.click('#presets button:nth-of-type(1)'); await page.click('#timerDone'); await page.waitForSelector('#timerPanel', { state: 'hidden' });
+    ok((await page.textContent('#readout')) === '30:00', 'back to 30 min: ' + await page.textContent('#readout'));
     // the session view
     await page.click('#go'); await page.waitForSelector('#vSession:not([hidden])'); await sleep(300);
     ok((await view()) === 'session' && await page.isHidden('#vHome'), 'session view replaces Home');

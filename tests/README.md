@@ -9,6 +9,7 @@ in WebKit (Safari's engine), which is what iPhone and iPad run.
 node tests/setup-flow.js webkit light    # setup step by step (with the check), test session, real session, end sheet, backup/restore/erase, 5 widths
 node tests/features.js webkit light      # needs the backup the line above saved in tests/out/
 node tests/sound-level.js webkit light   # Sound level: the line, near and far voices, switching, a muted hum (same backup)
+node tests/recording.js webkit light     # recording a session, the echo switch, the recordings in its sheet (same backup)
 node tests/setup-flow.js webkit neural   # then features.js webkit neural; also chromium light for both
 node tests/live.js                       # after a deploy: live bytes = site/, fonts, model, one real Claude summary
 ```
@@ -23,6 +24,15 @@ node tests/live.js                       # after a deploy: live bytes = site/, f
   stream (line −24 dB): with the other voices 15 dB quieter, 100% of your talk echoed and 100% of theirs ignored; with
   them as loud as yours, only 40% of theirs ignored (the hard male voice never). Its sounds are made in the page:
   the stream with the others at a gain, a 150 · 300 · 450 Hz hum, white noise, a 2 ms click.
+- `recording.js` ends `ALL PASS` or `N FAILED`. Playwright's WebKit on Linux has no MediaRecorder, so there it records
+  WAV from the fake mic's chunks (the path for any browser without MediaRecorder); Chromium records with MediaRecorder
+  from a real stream (a 220 Hz tone from the fake mic), the path iPhone takes with AAC. It checks Record in the session
+  row, the echo switch (no echo or chime while off, echoes again when back on), a too-short recording, recording
+  through a held pause, a call cutting one off, the timer ending a session mid-recording (a 9-second session kept for
+  its recording), the sheet (play decodes to the recorded length, Save names the file for the day and time, Delete
+  removes its parts), a reload, Past sessions' "Recorded", deleting a session, and the clean-up of unlisted parts.
+  `features.js` checks the timer: presets 30 min to 16 hr, the − / + steps, "Until a time" 20 hours away held to 16,
+  and 16:00:00 fitting at 390 px.
 - Screenshots and backup files go to `tests/out/` (ignored by git).
 
 Needs Playwright with WebKit. The scripts load `playwright-core` (or `/opt/node-tools/node_modules/playwright-core`);

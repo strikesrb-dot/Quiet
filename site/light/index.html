@@ -84,6 +84,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .glass { background: var(--q-glass); -webkit-backdrop-filter: var(--q-blur); backdrop-filter: var(--q-blur); box-shadow: var(--q-glass-rim), var(--q-glass-edge), var(--q-sh-glass); }
 .hero { text-align: center; font: 700 var(--q-t-hero-s)/1 var(--q-ui); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 @media (min-width: 700px) { .hero { font-size: var(--q-t-hero); } .card { padding: 24px 28px; } }
+.hero.long { font-size: min(var(--q-t-hero), 16.5vw); } /* h:mm:ss (up to 16:00:00) fits a phone */
 .live { justify-self: center; display: inline-flex; align-items: center; gap: 10px; min-height: var(--tap); padding: 0 18px; border-radius: var(--q-r-cap);
   background: var(--q-fill); color: var(--q-ink2); font-size: var(--q-t-min); font-weight: 600; max-width: 100%; }
 .live .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--q-chev); flex: none; }
@@ -132,6 +133,11 @@ a.row { text-decoration: none; cursor: pointer; }
 .field.grow { flex: 1; }
 .field[type="time"] { min-width: 128px; }
 .rv.wrap { white-space: normal; text-align: end; }
+.recs .row.btns { padding-top: 0; }
+.btn.plain.danger { color: var(--q-danger); }
+.recs .row.btns::before, .recs .row.player::before { content: none; }
+.recs .row.player { padding-top: 0; }
+.recs audio { width: 100%; min-width: 0; height: 44px; }
 .field::placeholder { color: var(--q-ink2); }
 
 /* one segmented control */
@@ -306,10 +312,14 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
 .s-kind::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--q-acc); }
 .session .quietl { margin: 0; font-size: var(--q-t-body); }
 .session .live { justify-self: center; }
-.s-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--q-sp); }
-.s-row .btn { min-height: 54px; padding: 0 12px; }
+.s-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--q-sp); }
+.s-row .btn { min-height: 54px; padding: 0 10px; }
+/* recording: the button turns red and shows how long; the dot pulses */
+#sRec.on { color: var(--q-danger); font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: no-preference) { #sRec.on .ic { animation: recPulse 1.6s ease-in-out infinite; } }
+@keyframes recPulse { 50% { opacity: .35; } }
 .s-row #stop, .s-row #endSession { grid-column: 1 / -1; }
-@media (min-width: 700px) { .s-row { grid-template-columns: 1fr 1fr 1.5fr; } .s-row #stop, .s-row #endSession { grid-column: auto; }
+@media (min-width: 700px) { .s-row { grid-template-columns: 1fr 1fr 1fr 1.5fr; } .s-row #stop, .s-row #endSession { grid-column: auto; }
   /* on a tablet or a computer a session sits in the middle of the screen, like a clock, not in its top half */
   body.in-session .win { min-height: calc(100vh - 52px); min-height: calc(100dvh - max(20px, env(safe-area-inset-top, 0px)) - max(32px, env(safe-area-inset-bottom, 0px))); align-content: center; } }
 .btn.hold { gap: 10px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
@@ -374,6 +384,7 @@ body.lv-mode .lvwrap .meter { height: 10px; }
   <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
   <symbol id="i-turn" viewBox="0 0 24 24"><path d="M4.5 10.5a8 8 0 0 1 14-3.5l1.5 1.5"/><path d="M20 4v4.5h-4.5"/><path d="M19.5 13.5a8 8 0 0 1-14 3.5L4 15.5"/><path d="M4 20v-4.5h4.5"/></symbol>
   <symbol id="i-minus" viewBox="0 0 24 24"><path d="M6 12h12"/></symbol>
+  <symbol id="i-rec" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle class="dot" cx="12" cy="12" r="3.6" fill="currentColor" stroke="none"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M6 12h12M12 6v12"/></symbol>
   <symbol id="i-steps" viewBox="0 0 24 24"><path d="M3.5 6.5l1.7 1.7 3-3.2M3.5 12.5l1.7 1.7 3-3.2"/><circle cx="5.5" cy="18.5" r="1.7"/><path d="M11.5 7h9M11.5 13h9M11.5 18.5h9"/></symbol>
 </svg>
@@ -435,6 +446,7 @@ body.lv-mode .lvwrap .meter { height: 10px; }
     <div class="s-row">
       <button id="sCard" class="btn glass" type="button"><svg class="ic" aria-hidden="true"><use href="#i-card"/></svg>Card</button>
       <button id="sSign" class="btn glass" type="button"><svg class="ic" aria-hidden="true"><use href="#i-sign"/></svg>Sign</button>
+      <button id="sRec" class="btn glass" type="button"><svg class="ic" aria-hidden="true"><use href="#i-rec"/></svg><span id="sRecText">Record</span></button>
       <button id="stop" class="btn strong hold" type="button"><svg class="ring" viewBox="0 0 24 24" aria-hidden="true"><circle class="track" cx="12" cy="12" r="9"/><circle class="fill" cx="12" cy="12" r="9" pathLength="100"/></svg><span id="stopText">Hold to pause</span></button>
       <button id="endSession" class="btn glass" type="button" hidden>End session</button>
     </div>
@@ -569,6 +581,9 @@ body.lv-mode .lvwrap .meter { height: 10px; }
 <div id="endPanel" class="sheet paged" role="dialog" aria-modal="true" aria-labelledby="endTitle" hidden>
   <div class="sheet-head"><h2 id="endTitle">Session done</h2><button id="endClose" class="round" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
   <div class="group" id="endStats"></div>
+  <h3 class="cap" id="capRecs" hidden>Recordings</h3>
+  <div class="group recs" id="endRecs" hidden></div>
+  <p class="hint" id="recsHint" hidden>Recordings stay on this device, and a backup file doesn't include them. Save the ones you want to keep.</p>
   <h3 class="cap" id="capMood">How did it go?</h3>
   <div class="seg" id="moodSeg" role="radiogroup" aria-labelledby="capMood"></div>
   <textarea id="endNote" class="field area" maxlength="300" placeholder="A note for yourself (optional)" aria-label="A note for yourself"></textarea>
@@ -605,9 +620,10 @@ body.lv-mode .lvwrap .meter { height: 10px; }
   <div class="sheet-head"><h2 id="timerTitle">Session length</h2><button id="timerClose" class="round" type="button" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
   <div class="group">
     <div class="row full"><div class="seg" id="presets" role="radiogroup" aria-label="Session length"></div></div>
-    <div class="row"><span class="rt" id="minsLabel">Minutes</span><div class="stp" role="group" aria-labelledby="minsLabel"><button id="minsDown" type="button" aria-label="Fewer minutes">−</button><output id="minsOut">30</output><button id="minsUp" type="button" aria-label="More minutes">+</button></div></div>
+    <div class="row"><span class="rt" id="minsLabel">Length</span><div class="stp" role="group" aria-labelledby="minsLabel"><button id="minsDown" type="button" aria-label="Shorter">−</button><output id="minsOut">30</output><button id="minsUp" type="button" aria-label="Longer">+</button></div></div>
     <div class="row"><label class="rt" for="until">Until a time</label><button id="clearUntil" class="btn plain" type="button" hidden>Clear</button><input id="until" class="field" type="time"></div>
   </div>
+  <p class="hint">Up to 16 hours. Samt has to stay open with the screen on, so plug in for a long session.</p>
   <div class="actions"><button id="timerDone" class="btn strong" type="button">Done</button></div>
 </div>
 
@@ -703,6 +719,7 @@ body.lv-mode .lvwrap .meter { height: 10px; }
   </div>
   <input id="restoreFile" type="file" accept="application/json,.json" hidden>
   <p class="hint">Safari can clear a website's data if you don't open it for a week. Keep a backup file, or add Samt to your Home Screen (Share, then Add to Home Screen).</p>
+  <p class="hint">A backup file has your setup and past sessions, not their recordings. Save a recording you want to keep from its session in Past sessions.</p>
   <p class="hint" id="storeWarn" hidden>This browser won't keep Samt's setup (Private Browsing or blocked storage), so it will be lost when you close the page.</p>
   <div class="actions"><button id="dataDone" class="btn strong" type="button">Done</button></div>
 </div>
@@ -715,7 +732,7 @@ body.lv-mode .lvwrap .meter { height: 10px; }
     <a class="row" href="../"><span class="rt">Light and Neural</span><span class="rv">Light</span><svg class="ic chev"><use href="#i-chev"/></svg></a>
   </div>
   <p class="hint">Wear headphones, or the speaker feeds back into the mic. Keep Samt open and in front while it runs; iPadOS stops the mic in the background. Don't use it at the ramp or jetbridge, or while driving.</p>
-  <p class="hint">Your voice, the audio and your setup stay on this device, saved in this browser only. When you ask Claude for a summary, that session's numbers, your mood and your note are sent to Claude, and nothing else.</p>
+  <p class="hint">Your voice, your recordings and your setup stay on this device, saved in this browser only. When you ask Claude for a summary, that session's numbers, your mood and your note are sent to Claude, and nothing else.</p>
   
   <div class="actions"><button id="aboutDone" class="btn strong" type="button">Done</button></div>
 </div>
@@ -1867,6 +1884,8 @@ registerProcessor('samt-tap', SamtTap);
       return this;
     }
     trackLive() { const t = this.stream && this.stream.getAudioTracks()[0]; return !!(t && t.readyState === 'live' && !t.muted); }
+    /* What a recording records: the mic's own stream, never the echo. */
+    recStream() { return this.stream || null; }
     get running() { return !!(this.live && this.ctx && this.ctx.state === 'running'); }
     async resume() { if (!this.ctx) return false; await withTimeout(this.ctx.resume().catch(() => {}), 1000); return this.ctx.state === 'running'; }
     setEcho(open) {
@@ -1943,6 +1962,17 @@ registerProcessor('samt-tap', SamtTap);
     setDelay() {} setVolume() {}
     setNotches(tones) { this.tones = (tones || []).slice(); }
     stop() { /* the test keeps one fake mic for the whole run */ }
+    /* Where the browser has MediaRecorder, a real stream to record (a quiet 220 Hz tone); elsewhere none, and a
+       recording is WAV built from the fake chunks. Call inside the tap. */
+    recStream() {
+      if (!G.MediaRecorder) return null;
+      if (!this.recDest) {
+        const AC = G.AudioContext || G.webkitAudioContext, ctx = this.recCtx = new AC(), o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.value = 220; g.gain.value = 0.05; this.recDest = ctx.createMediaStreamDestination(); o.connect(g); g.connect(this.recDest); o.start();
+      }
+      try { this.recCtx.resume(); } catch (e) {}
+      return this.recDest.stream;
+    }
   }
 
   /* IndexedDB key-value store. Reopens once if Safari dropped the connection; falls back to memory. */
@@ -1978,6 +2008,89 @@ registerProcessor('samt-tap', SamtTap);
     };
   }
 
+  /* ---------- recording a session ---------- */
+  /* Records the mic only, never the echo. MediaRecorder on the mic's own stream where the browser has one (iPhone: AAC,
+     saved as .m4a), else 16 kHz 16-bit WAV from the same chunks the listener gets (add()). A part comes out about every
+     10 s through onPart (a Blob, or an ArrayBuffer of samples); onEnd: the browser stopped it (the mic was cut off). */
+  const REC_TYPES = ['audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/webm'];
+  class Recorder {
+    constructor(stream, { onPart, onEnd } = {}) {
+      this.onPart = onPart || (() => {}); this.onEnd = onEnd || (() => {});
+      this.t0 = Date.now(); this.t1 = 0; this.samples = 0; this.asked = false; this.over = false;
+      const MR = G.MediaRecorder;
+      if (stream && MR) {
+        const type = REC_TYPES.find(t => { try { return MR.isTypeSupported(t); } catch (e) { return false; } }) || '';
+        let mr;
+        try { mr = new MR(stream, Object.assign({ audioBitsPerSecond: 32000 }, type ? { mimeType: type } : {})); } catch (e) { mr = new MR(stream); }
+        this.kind = 'mr'; this.mr = mr;
+        this.mime = String(mr.mimeType || type || 'audio/mp4').split(';')[0].trim() || 'audio/mp4';
+        this.done = new Promise(res => { mr.onstop = () => { this._end(); res(); if (!this.asked) this.onEnd(); }; });
+        mr.ondataavailable = e => { if (e.data && e.data.size) this.onPart(e.data); };
+        mr.onerror = () => { try { if (mr.state !== 'inactive') mr.stop(); } catch (e) {} };
+        mr.start(10000);
+      } else {
+        this.kind = 'wav'; this.mime = 'audio/wav'; this.buf = new Int16Array(160000); this.n = 0; this.done = Promise.resolve();
+      }
+    }
+    _end() { if (!this.over) { this.over = true; this.t1 = Date.now(); } }
+    /* The WAV path: the mic's 16 kHz chunks. */
+    add(x) {
+      if (this.kind !== 'wav' || this.over) return;
+      for (let i = 0; i < x.length; i++) { const v = x[i] < -1 ? -1 : x[i] > 1 ? 1 : x[i]; this.buf[this.n++] = v < 0 ? v * 0x8000 : v * 0x7fff; if (this.n === this.buf.length) this._flush(); }
+      this.samples += x.length;
+    }
+    _flush() { if (this.n) { this.onPart(this.buf.slice(0, this.n).buffer); this.n = 0; } }
+    /* Seconds recorded so far. */
+    sec() { return this.kind === 'wav' ? this.samples / 16000 : ((this.over ? this.t1 : Date.now()) - this.t0) / 1000; }
+    /* Stops it; resolves once the last part has been handed over (a browser that never says so: after 4 s). */
+    stop() {
+      this.asked = true;
+      if (this.kind === 'wav') { if (!this.over) { this._flush(); this._end(); } return this.done; }
+      try { if (this.mr.state !== 'inactive') this.mr.stop(); } catch (e) {}
+      return Promise.race([this.done, new Promise(r => setTimeout(r, 4000))]).then(() => this._end());
+    }
+  }
+  /* The 44 bytes in front of 16 kHz mono 16-bit samples that make them a .wav file. */
+  function wavHeader(bytes, rate = 16000) {
+    const h = new DataView(new ArrayBuffer(44)), w = (o, t) => { for (let i = 0; i < 4; i++) h.setUint8(o + i, t.charCodeAt(i)); };
+    w(0, 'RIFF'); h.setUint32(4, 36 + bytes, true); w(8, 'WAVE'); w(12, 'fmt '); h.setUint32(16, 16, true); h.setUint16(20, 1, true); h.setUint16(22, 1, true);
+    h.setUint32(24, rate, true); h.setUint32(28, rate * 2, true); h.setUint16(32, 2, true); h.setUint16(34, 16, true); w(36, 'data'); h.setUint32(40, bytes, true);
+    return h.buffer;
+  }
+  /* Recordings' parts, straight to IndexedDB (no copy kept in memory, unlike openStore). A part's key is
+     `${clip}:${00000}`, so a clip's parts come back in order. */
+  function openBlobs(name) {
+    let dbp = null;
+    const open = () => new Promise((res, rej) => {
+      if (!G.indexedDB) { rej(new Error('no IndexedDB')); return; }
+      const r = G.indexedDB.open(name, 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('parts');
+      r.onsuccess = () => { const db = r.result; db.onclose = () => { dbp = null; }; db.onversionchange = () => { db.close(); dbp = null; }; res(db); };
+      r.onerror = () => rej(r.error || new Error('open failed')); r.onblocked = () => rej(new Error('blocked'));
+    });
+    const getDb = () => (dbp = dbp || open().catch(e => { dbp = null; throw e; }));
+    const tx = async (mode, fn, retry = true) => {
+      const db = await getDb();
+      try {
+        return await new Promise((res, rej) => {
+          let t; try { t = db.transaction('parts', mode); } catch (e) { rej(e); return; }
+          const r = fn(t.objectStore('parts')); t.oncomplete = () => res(r && r.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error || new Error('aborted'));
+        });
+      } catch (e) {
+        if (retry && e && e.name === 'InvalidStateError') { dbp = null; return tx(mode, fn, false); } // Safari dropped the connection
+        throw e;
+      }
+    };
+    const range = id => G.IDBKeyRange.bound(id + ':', id + ':\uffff');
+    return {
+      put: (key, buf) => tx('readwrite', s => s.put(buf, key)),
+      parts: id => tx('readonly', s => s.getAll(range(id))),
+      count: id => tx('readonly', s => s.count(range(id))),
+      keys: () => tx('readonly', s => s.getAllKeys()),
+      del: id => tx('readwrite', s => s.delete(range(id)))
+    };
+  }
+
   /* Backup files: typed arrays become base64 inside plain JSON. */
   function b64(u8) { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
   function unb64(s) { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
@@ -1994,7 +2107,7 @@ registerProcessor('samt-tap', SamtTap);
     return v;
   }
 
-  S.mic = { MicEngine, FakeMic, openStore, pack, unpack };
+  S.mic = { MicEngine, FakeMic, openStore, openBlobs, Recorder, wavHeader, pack, unpack };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
 
 /* Samt app (Quiet Glass UI): setup flows, live session, timer, settings, backup. MODE is 'light' or 'neural'. */
@@ -2007,6 +2120,7 @@ registerProcessor('samt-tap', SamtTap);
   const params = new URLSearchParams(location.search);
   const FAKE = params.has('fakemic');
   const store = S.mic.openStore('samt');
+  const blobs = S.mic.openBlobs('samt-rec'); // recordings' audio, in parts
   const K = k => MODE + ':' + k;
   const PASSAGE = [
     "Alright, I'm reading this out loud so the app can learn what my voice sounds like.",
@@ -2028,7 +2142,7 @@ registerProcessor('samt-tap', SamtTap);
   const DEF = { mins: 30, delay: 200, vol: 100, strict: 0, kind: 'silence', limit: 15, noInterrupt: true, nudge: true, who: 'voice' };
   const settings = Object.assign({}, DEF, (() => { try { return JSON.parse(localStorage.getItem('samt.' + MODE + '.settings') || '{}'); } catch (e) { return {}; } })());
   settings.vol = Math.min(100, settings.vol); settings.strict = Math.max(-1, Math.min(1, Math.round(settings.strict))); delete settings.psens;
-  settings.kind = settings.kind === 'conversation' ? 'conversation' : 'silence'; settings.limit = Math.max(5, Math.min(60, Math.round(+settings.limit || 15)));
+  settings.mins = Math.max(5, Math.min(960, Math.round(+settings.mins || 30))); settings.kind = settings.kind === 'conversation' ? 'conversation' : 'silence'; settings.limit = Math.max(5, Math.min(60, Math.round(+settings.limit || 15)));
   settings.who = settings.who === 'level' ? 'level' : 'voice';
   const saveSettings = () => { try { localStorage.setItem('samt.' + MODE + '.settings', JSON.stringify(settings)); } catch (e) {} };
   const strictValue = () => settings.strict * 1.6;          // threshold moves by 0.8 of your score spread per step
@@ -2062,6 +2176,7 @@ registerProcessor('samt-tap', SamtTap);
   let profile = { meSegs: [], othSegs: [], adaptSegs: [] };
   let ortSession = null, modelP = null, modelMs = 0;
   let session = null; // {mode, endAt, startedAt, timer, paused}
+  let tape = null, tapeWait = false; // the recording running now: {r: Recorder, clip, chain, n, failed}
   let wakeLock = null, lastRec = null, toastTimer = 0, pendingFixes = [], howl = 0, echoHoldUntil = 0, starting = null;
   let history = [], endRec = null, endMood = null, moodCtl = null, showCtx = null, cardsEditing = false, txtResolve = null, strictCtl = null;
   const mic = FAKE ? new S.mic.FakeMic({ onChunk: onAudio }) : new S.mic.MicEngine({ onChunk: onAudio, onTrouble });
@@ -2074,6 +2189,7 @@ registerProcessor('samt-tap', SamtTap);
   const tick = () => new Promise(r => setTimeout(r, 30));
 
   function onAudio(c) {
+    if (tape) tape.r.add(c); // a recording without MediaRecorder (WAV) keeps going through a held pause: the mic is still on
     if (session && session.paused) return; // a paused session's sound is set aside: no echo, no counting, no clock
     listener.push(c);
     if (gateTap) gateTap.push(c);
@@ -2092,7 +2208,7 @@ registerProcessor('samt-tap', SamtTap);
   function fmt(sec) { const s = Math.max(0, Math.ceil(sec)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), r = s % 60; const mm = String(m).padStart(2, '0'), rr = String(r).padStart(2, '0'); return h ? `${h}:${mm}:${rr}` : `${mm}:${rr}`; }
   const pad2 = n => String(n).padStart(2, '0');
   function clock(sec) { const s = Math.max(0, Math.floor(sec || 0)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), r = s % 60; return h ? `${h}:${pad2(m)}:${pad2(r)}` : `${m}:${pad2(r)}`; }
-  function minsText(sec) { const s = Math.floor(sec || 0), m = s / 60; return m < 1 ? `${s} s` : m < 10 ? `${(Math.floor(m * 10) / 10).toString()} min` : `${Math.floor(m)} min`; }
+  function minsText(sec) { const s = Math.floor(sec || 0), m = s / 60; if (m >= 60) { const h = Math.floor(m / 60), r = Math.floor(m % 60); return r ? `${h} hr ${r} min` : `${h} hr`; } return m < 1 ? `${s} s` : m < 10 ? `${(Math.floor(m * 10) / 10).toString()} min` : `${Math.floor(m)} min`; }
   const dayKey = t => { const d = new Date(t); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
   const timeStr = t => new Date(t).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   function whenStr(t) {
@@ -2209,6 +2325,7 @@ registerProcessor('samt-tap', SamtTap);
     if (kind === 'unmuted') return;
     // interrupted (call, Siri, lock, app switch), muted, or ended: stop the echo at once and ask for a tap
     mic.setEcho(false);
+    if (tape) endTape('cut'); // a recording keeps what it has
     if (capture) cancelMute('The mic stopped. Try again.'); // listening to a sound to mute
     if (session && !session.paused) pauseSession(false);
     else if (rec && (rec.kind === 'me' || rec.kind === 'oth')) {
@@ -2499,11 +2616,20 @@ registerProcessor('samt-tap', SamtTap);
   closers.mute = () => { if (capture) cancelMute(''); closeSheet('mute'); };
 
   /* ---------- session ---------- */
-  function plannedMs() {
-    const until = $('until').value;
-    if (until) { const [h, m] = until.split(':').map(Number), t = new Date(); t.setHours(h, m, 0, 0); if (t.getTime() <= Date.now()) t.setDate(t.getDate() + 1); return t.getTime() - Date.now(); }
-    return Math.max(1, Math.min(720, settings.mins)) * 60000;
+  const MAX_MINS = 960; // sessions run up to 16 hours (and "Until a time" up to 16 hours away)
+  function untilMs() {
+    const until = $('until').value; if (!until) return null;
+    const [h, m] = until.split(':').map(Number), t = new Date(); t.setHours(h, m, 0, 0); if (t.getTime() <= Date.now()) t.setDate(t.getDate() + 1);
+    return t.getTime() - Date.now();
   }
+  function plannedMs() {
+    const u = untilMs();
+    return u != null ? Math.min(u, MAX_MINS * 60000) : Math.max(1, Math.min(MAX_MINS, settings.mins)) * 60000;
+  }
+  /* A length in words for the stepper: 45 min, 2 hr, 8 hr 15 min. */
+  const lenText = m => m < 60 ? `${m} min` : `${Math.floor(m / 60)} hr` + (m % 60 ? ` ${m % 60} min` : '');
+  /* A time readout; hours and over get the smaller hero size so 16:00:00 fits a phone. */
+  function setReadout(el, sec) { const t = fmt(sec); el.textContent = t; el.classList.toggle('long', t.length > 5); }
   function stateText(e) {
     const test = session && session.mode === 'test';
     if (session && session.who === 'level') {
@@ -2655,8 +2781,10 @@ registerProcessor('samt-tap', SamtTap);
   function sessionSnap() {
     const s = session; if (!s || s.mode === 'test' || !ctrl) return null;
     const c = ctrl.counts;
-    return { id: s.recId, at: s.startedAt, dur: FAKE ? Math.round((s.fakeSec || 0) + listener.fs.nFrames / 100) : Math.round(activeMs(s) / 1000), page: MODE, kind: s.kind, who: s.usedLevel ? 'level' : 'voice', talkTime: +c.talkTime.toFixed(2), meSec: +c.meSec.toFixed(2), otherSec: +c.otherSec.toFixed(2),
+    const out = { id: s.recId, at: s.startedAt, dur: FAKE ? Math.round((s.fakeSec || 0) + listener.fs.nFrames / 100) : Math.round(activeMs(s) / 1000), page: MODE, kind: s.kind, who: s.usedLevel ? 'level' : 'voice', talkTime: +c.talkTime.toFixed(2), meSec: +c.meSec.toFixed(2), otherSec: +c.otherSec.toFixed(2),
       talks: c.talk, interrupts: c.interrupt, nudges: c.nudge, freePass: c.freePass, shorts: c.short, others: c.other, bestQuiet: Math.round(s.bestQuiet) };
+    if (s.clips && s.clips.length) out.clips = s.clips.map(x => Object.assign({}, x)); // its recordings (the audio is in blobs)
+    return out;
   }
   function tickSession() {
     if (!session) return;
@@ -2667,8 +2795,9 @@ registerProcessor('samt-tap', SamtTap);
       else if (micOk()) endPause();
       else { session.holdPause = false; live('paused', 'Paused. Tap Resume.'); render(); }
     }
-    if (session.endAt) { const left = (session.endAt - sessionNow(session)) / 1000; $('sReadout').textContent = fmt(left); if (left <= 0 && !session.paused) { stopSession(true); return; } }
-    else $('sReadout').textContent = fmt(activeMs(session) / 1000);
+    if (session.endAt) { const left = (session.endAt - sessionNow(session)) / 1000; setReadout($('sReadout'), left); if (left <= 0 && !session.paused && !session.stopping) { stopSession(true); return; } }
+    else setReadout($('sReadout'), activeMs(session) / 1000);
+    if (tape) { const sec = tape.r.sec(); tape.clip.dur = Math.round(sec); $('sRecText').textContent = clock(sec); }
     if (!ctrl || session.paused) return;
     // the quiet timer: since your last words (or since the start)
     const g = ctrl.seg, talking = ctrl.talking ? ctrl.talking() : !!(g && g.speaker === 'me');
@@ -2678,10 +2807,14 @@ registerProcessor('samt-tap', SamtTap);
     // talk freely: the time until the echo is back on the pill; on the button, adding 20 s and how many taps are left,
     // or when Talk freely is back
     const left = ctrl.passLeft(), fs = freeState();
-    $('pass').textContent = fs.locked ? `Talk freely in ${clock(fs.lockLeft)}`
-      : (left > 0 ? `Add ${FREE_SEC} s` : `Talk freely, ${FREE_SEC} s`) + (fs.left < FREE_TAPS ? ` · ${fs.left} left` : '');
-    $('pass').disabled = fs.locked;
-    if (left > 0) { live('pass', `Echo back in ${clock(Math.ceil(left))}`); session.passing = true; }
+    if (tape) { $('pass').textContent = session.echoOff ? 'Turn the echo back on' : 'Turn the echo off'; $('pass').disabled = false; } // while recording: no limit
+    else {
+      $('pass').textContent = fs.locked ? `Talk freely in ${clock(fs.lockLeft)}`
+        : (left > 0 ? `Add ${FREE_SEC} s` : `Talk freely, ${FREE_SEC} s`) + (fs.left < FREE_TAPS ? ` · ${fs.left} left` : '');
+      $('pass').disabled = fs.locked;
+    }
+    if (session.echoOff) { live('pass', 'Echo off'); session.passing = true; }
+    else if (left > 0) { live('pass', `Echo back in ${clock(Math.ceil(left))}`); session.passing = true; }
     else if (session.passing) { session.passing = false; live('on', 'Listening'); }
     renderTL(); $('cTalkTime').textContent = clock(ctrl.counts.talkTime);
     if (session.mode === 'test') return;
@@ -2695,7 +2828,8 @@ registerProcessor('samt-tap', SamtTap);
     if (session.warned < 2 && t >= bud) { session.warned = 2; toast("You've used today's talk budget."); }
   }
   async function stopSession(finished) {
-    if (!session) return;
+    if (!session || session.stopping) return;
+    if (tape) { session.stopping = true; render(); await endTape('end'); if (!session) return; } // its last part first
     if (ctrl && ctrl.seg) { try { ctrl.cut(); } catch (e) {} } // count the words still in progress
     if (capture && capture.inSession) cancelMute(''); // the session's mic is about to stop
     const snap = sessionSnap(), adaptQ = session.adaptQ.concat(ctrl && ctrl.adaptQueue ? ctrl.adaptQueue : []); // Sound level adds none
@@ -2706,8 +2840,8 @@ registerProcessor('samt-tap', SamtTap);
     $('remind').hidden = true; leaveSession();
     refreshReadout(); setBusy(null);
     live(finished ? 'done' : 'off', finished ? `Done. You talked ${c.talk} time${c.talk === 1 ? '' : 's'}.` : 'Stopped');
-    // keep the session (30 seconds or longer) and open its summary
-    if (snap && snap.dur >= 30) {
+    // keep the session (30 seconds or longer, or with a recording) and open its summary
+    if (snap && (snap.dur >= 30 || snap.clips)) {
       snap.open = false;
       try { await putRecord(snap); } catch (e) {}
       renderHistory(); renderToday();
@@ -2732,7 +2866,7 @@ registerProcessor('samt-tap', SamtTap);
      and Resume starts it again inside its tap), or from a call, Siri or the screen locking. Resume carries on; End
      session finishes it. */
   function pauseSession(byHold) {
-    if (!session || session.paused) return;
+    if (!session || session.paused || session.stopping) return;
     session.paused = true; session.pausedAt = Date.now(); session.holdPause = !!byHold;
     if (ctrl) { try { ctrl.cut(); } catch (e) {} }
     mic.setEcho(false); if (capture && capture.inSession) cancelMute('');
@@ -2761,6 +2895,143 @@ registerProcessor('samt-tap', SamtTap);
     saveShared();
     ctrl.pass(Math.min(FREE_MAX, ctrl.passLeft() + FREE_SEC)); tickSession();
     if (third) toast('That was 3 in 10 minutes: Talk freely is off for an hour after this one.');
+  }
+  /* ---------- recording a session: the mic only (you and anyone near you), never the echo; kept on this device ---------- */
+  const ECHO_OFF_SEC = 24 * 3600; // "echo off" is a Talk freely with no end that isn't counted as a tap
+  async function startTape() {
+    if (!session || session.mode === 'test' || tape || tapeWait || session.stopping) return;
+    if (session.paused && !session.holdPause) { toast('Tap Resume first.'); return; }
+    const stream = mic.recStream ? mic.recStream() : null; // inside the tap
+    tapeWait = true; render();
+    try {
+      let room = Infinity;
+      try { const e = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null; if (e && e.quota) room = e.quota - (e.usage || 0); } catch (e) {}
+      if (room < 25e6) { toast('Not enough room on this device to record.'); return; }
+      const s = session; if (!s || s.stopping || tape || (s.paused && !s.holdPause)) return;
+      const t = { r: null, clip: null, chain: Promise.resolve(), n: 0, failed: null };
+      const opts = { onPart: d => keepPart(t, d), onEnd: () => { if (tape === t) endTape('cut'); } };
+      try { t.r = new S.mic.Recorder(stream, opts); } catch (e) { t.r = new S.mic.Recorder(null, opts); } // MediaRecorder said no: WAV
+      s.clipN = (s.clipN || 0) + 1; // a clip's id is never used twice, even after a too-short one is dropped
+      t.clip = { id: `${s.recId}.${s.clipN}`, mime: t.r.mime, parts: 0, bytes: 0, dur: 0, at: Date.now(), done: false };
+      (s.clips = s.clips || []).push(t.clip); tape = t;
+      const snap = sessionSnap(); if (snap) putRecord(Object.assign(snap, { open: true })).catch(() => {}); // listed at once, in case the tab closes
+      try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+    } catch (e) { toast("Couldn't start recording on this device."); }
+    finally { tapeWait = false; render(); if (session) tickSession(); }
+  }
+  /* A part to disk, in order; if one can't be saved, the recording stops with what it has. */
+  function keepPart(t, d) {
+    const c = t.clip, key = `${c.id}:${String(t.n++).padStart(5, '0')}`;
+    t.chain = t.chain.then(async () => {
+      if (t.failed) return;
+      const buf = d instanceof ArrayBuffer ? d : await (d.arrayBuffer ? d.arrayBuffer() : new Response(d).arrayBuffer());
+      await blobs.put(key, buf); c.parts++; c.bytes += buf.byteLength;
+    }).catch(e => { if (!t.failed) { t.failed = e || new Error('not saved'); if (tape === t) endTape(e && e.name === 'QuotaExceededError' ? 'full' : 'fail'); } });
+  }
+  /* Stops the recording and keeps it (why: '' a tap, 'end' the session ended, 'cut' the mic stopped, 'full' / 'fail'
+     a part couldn't be saved). The echo comes back. */
+  async function endTape(why) {
+    const t = tape; if (!t) return;
+    tape = null;
+    if (session && session.echoOff) setEchoOff(false);
+    render();
+    try { await t.r.stop(); } catch (e) {}
+    try { await t.chain; } catch (e) {}
+    const c = t.clip, s = session && session.clips && session.clips.includes(c) ? session : null;
+    c.dur = Math.round(t.r.sec()); c.done = true;
+    const kept = c.parts > 0 && t.r.sec() >= 1;
+    if (!kept) { if (s) s.clips = s.clips.filter(x => x !== c); blobs.del(c.id).catch(() => {}); } // too short to keep
+    if (s && !s.stopping) { const snap = sessionSnap(); if (snap) putRecord(Object.assign(snap, { open: true })).catch(() => {}); }
+    render(); if (session) tickSession();
+    const say = { '': kept ? 'Recording saved. It shows with this session when the session ends.' : 'Too short to keep.',
+      cut: 'The mic stopped, so the recording did too. What it got is kept.',
+      full: 'This device is out of room, so the recording stopped. What it got is kept.',
+      fail: "Couldn't save the recording on this device, so it stopped." }[why];
+    if (say) toast(say);
+  }
+  /* While recording, Talk freely's button turns the echo off and on, with no limit: no echo and no nudges, and your
+     talk still counts. */
+  function setEchoOff(off) {
+    if (!session || !ctrl || !!session.echoOff === !!off) return;
+    session.echoOff = !!off;
+    ctrl.pass(off ? ECHO_OFF_SEC : 0, true);
+    if (!off && !session.paused) { session.passing = false; live('on', 'Listening'); }
+    tickSession();
+  }
+  /* A session's recordings in its sheet: play, save to a file, delete. A clip is put together from its parts when asked. */
+  let recUrls = [];
+  function stopPlayers() {
+    $('endRecs').querySelectorAll('audio').forEach(a => { try { a.pause(); a.removeAttribute('src'); a.load(); } catch (e) {} });
+    for (const u of recUrls) URL.revokeObjectURL(u); recUrls = [];
+  }
+  async function clipBlob(c) {
+    const parts = await blobs.parts(c.id);
+    if (!parts || !parts.length) return null;
+    if (c.mime === 'audio/wav') return new Blob([S.mic.wavHeader(parts.reduce((a, p) => a + p.byteLength, 0)), ...parts], { type: 'audio/wav' });
+    return new Blob(parts, { type: c.mime || 'audio/mp4' });
+  }
+  const clipExt = m => m === 'audio/wav' ? 'wav' : /webm/.test(m || '') ? 'webm' : 'm4a';
+  function clipName(c) { const d = new Date(c.at); return `samt-${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}.${clipExt(c.mime)}`; }
+  const sizeText = b => b >= 1e9 ? (b / 1e9).toFixed(1) + ' GB' : b >= 1e6 ? Math.round(b / 1e5) / 10 + ' MB' : Math.max(1, Math.round(b / 1e3)) + ' KB';
+  function renderRecs(r) {
+    stopPlayers();
+    const box = $('endRecs'), clips = Array.isArray(r.clips) ? r.clips.filter(c => c && c.id) : [];
+    box.textContent = ''; box.hidden = $('capRecs').hidden = $('recsHint').hidden = !clips.length;
+    clips.forEach((c, i) => {
+      const row = document.createElement('div'); row.className = 'row';
+      const t = document.createElement('span'); t.className = 'rt'; t.textContent = clips.length > 1 ? `Recording ${i + 1}` : 'Recording';
+      const s2 = document.createElement('span'); s2.className = 'r2'; s2.textContent = `${timeStr(c.at)} · ${sizeText(+c.bytes || 0)}${c.done ? '' : ' · cut off'}`; t.appendChild(s2);
+      const v = document.createElement('span'); v.className = 'rv'; v.textContent = clock(c.dur);
+      row.append(t, v);
+      const bar = document.createElement('div'); bar.className = 'row btns';
+      const btn = (label, fn, cls) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'btn plain' + (cls ? ' ' + cls : ''); b.textContent = label; b.onclick = fn; bar.appendChild(b); return b; };
+      let url = null;
+      const ready = async () => { if (!url) { const b = await clipBlob(c); if (b) { url = URL.createObjectURL(b); recUrls.push(url); } } return url; };
+      const missing = () => { s2.textContent = "This recording isn't on this device."; play.disabled = save.disabled = true; };
+      const play = btn('Play', async () => {
+        play.disabled = true;
+        const u = await ready().catch(() => null); if (!u) { missing(); return; }
+        const a = document.createElement('audio'); a.controls = true; a.preload = 'metadata';
+        const go = () => { a.play().catch(() => {}); };
+        // a recording without a length in it (Chrome's): seek to the end once so the player can show one
+        a.addEventListener('loadedmetadata', () => {
+          if (a.duration !== Infinity) { go(); return; }
+          a.addEventListener('timeupdate', function back() { a.removeEventListener('timeupdate', back); a.currentTime = 0; go(); });
+          a.currentTime = 1e7;
+        }, { once: true });
+        a.src = u;
+        const p = document.createElement('div'); p.className = 'row player'; p.appendChild(a); bar.after(p); play.remove();
+      });
+      const save = btn('Save', async () => {
+        const u = await ready().catch(() => null); if (!u) { missing(); return; }
+        const a = document.createElement('a'); a.href = u; a.download = clipName(c); document.body.appendChild(a); a.click(); a.remove();
+      });
+      btn('Delete', () => ask({ title: 'Delete this recording?', msg: "It's deleted from this device. A copy you saved stays.", actions: [{ label: 'Delete', danger: true, run: () => deleteClip(r, c) }] }), 'danger');
+      box.append(row, bar);
+      blobs.count(c.id).then(n => { if (!n) missing(); }).catch(() => {});
+    });
+  }
+  async function deleteClip(r, c) {
+    stopPlayers();
+    try { await blobs.del(c.id); } catch (e) {}
+    r.clips = (r.clips || []).filter(x => x.id !== c.id);
+    try { await putRecord({ id: r.id, at: r.at, clips: r.clips }); } catch (e) {}
+    if (endRec === r) renderRecs(r);
+    renderHistory(); toast('Recording deleted.');
+  }
+  /* Parts that no past session lists (a session dropped from the list, or one deleted on another page) go after a day.
+     Only when the list itself was read, so a failed read never takes recordings with it. */
+  async function sweepTapes() {
+    try {
+      const h = await store.get('shared:history'); if (!Array.isArray(h) || !h.length) return;
+      const keep = new Set(); for (const r of h) for (const c of (r && r.clips) || []) keep.add(c.id);
+      const old = new Set();
+      for (const k of await blobs.keys()) {
+        const id = String(k).split(':')[0]; if (keep.has(id) || old.has(id) || (tape && tape.clip.id === id)) continue;
+        const at = parseInt(id.slice(1), 36); if (at > 0 && Date.now() - at > 864e5) old.add(id);
+      }
+      for (const id of old) await blobs.del(id);
+    } catch (e) {}
   }
   async function requestWake() { try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch (e) { wakeLock = null; } }
   function releaseWake() { try { if (wakeLock) wakeLock.release(); } catch (e) {} wakeLock = null; }
@@ -2846,13 +3117,18 @@ registerProcessor('samt-tap', SamtTap);
     for (const r of list) {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'row';
       const t = document.createElement('span'); t.className = 'rt'; t.textContent = whenStr(r.at);
-      const s2 = document.createElement('span'); s2.className = 'r2'; s2.textContent = `${r.kind === 'conversation' ? 'Conversation' : 'Silence'}${r.who === 'level' ? ' · Sound level' : ''} · ${minsText(r.dur)}${MOODS[r.mood] ? ' · ' + MOODS[r.mood] : ''}`; t.appendChild(s2);
+      const s2 = document.createElement('span'); s2.className = 'r2'; s2.textContent = `${r.kind === 'conversation' ? 'Conversation' : 'Silence'}${r.who === 'level' ? ' · Sound level' : ''} · ${minsText(r.dur)}${MOODS[r.mood] ? ' · ' + MOODS[r.mood] : ''}${r.clips && r.clips.length ? ' · Recorded' : ''}`; t.appendChild(s2);
       const v = document.createElement('span'); v.className = 'rv'; v.textContent = clock(r.talkTime) + ' talk';
       b.append(t, v, chevron()); b.onclick = () => openEnd(r, true); box.appendChild(b);
     }
     const clr = document.createElement('button'); clr.type = 'button'; clr.className = 'row danger'; clr.textContent = 'Clear the past sessions';
-    clr.onclick = () => ask({ title: 'Clear the past sessions?', msg: 'Every past session on this device is deleted, for Light and Neural. Your voice setup stays.',
-      actions: [{ label: 'Clear them', danger: true, run: async () => { history = []; await store.set('shared:history', []); renderHistory(); renderToday(); toast('Cleared.'); } }] });
+    clr.onclick = () => ask({ title: 'Clear the past sessions?', msg: 'Every past session on this device is deleted, with its recordings, for Light and Neural. Your voice setup stays.',
+      actions: [{ label: 'Clear them', danger: true, run: async () => {
+        await loadHistory(); const gone = [].concat(...history.map(r => r.clips || []));
+        history = []; await store.set('shared:history', []);
+        for (const c of gone) await blobs.del(c.id).catch(() => {});
+        renderHistory(); renderToday(); toast('Cleared.');
+      } }] });
     box.appendChild(clr);
   }
 
@@ -2878,11 +3154,12 @@ registerProcessor('samt-tap', SamtTap);
     $('askClaude').disabled = false; $('askClaude').textContent = rec.summary ? 'Ask Claude again' : 'Ask Claude for a summary';
     $('claudeHint').textContent = CLAUDE_HINT; $('endDelete').hidden = !review;
     $('endTip').hidden = !!review || rec.who === 'level' || !(rec.others > 0) || !!profile.othSegs.length || !!(voice && voice.N && voice.N.length);
+    renderRecs(rec);
     openSheet('end');
   }
   function showSummary(t) { $('endSummary').hidden = !t; $('endSummaryText').textContent = t || ''; }
   async function closeEnd() {
-    const r = endRec; endRec = null; closeSheet('end');
+    const r = endRec; endRec = null; stopPlayers(); closeSheet('end');
     if (!r) return;
     r.note = $('endNote').value.trim().slice(0, 300); r.mood = endMood;
     try { await putRecord({ id: r.id, at: r.at, mood: r.mood, note: r.note, summary: r.summary || '' }); } catch (e) {}
@@ -3344,7 +3621,7 @@ registerProcessor('samt-tap', SamtTap);
 
   /* ---------- rendering ---------- */
   function setBusy(b) { busy = b; render(); }
-  function refreshReadout() { if (!session) $('readout').textContent = fmt(plannedMs() / 1000); }
+  function refreshReadout() { if (!session) setReadout($('readout'), plannedMs() / 1000); }
   function render() {
     const taught = !!(voice && voice.ready), modelOk = MODE !== 'neural' || !!ortSession, idle = !busy;
     $('voiceStatus').textContent = taught ? `${Math.round(frames(profile.meSegs) / 100)} s` + (profile.adaptSegs.length || (voice.adapted && voice.adapted.length) ? ', learning' : '') : 'Not taught';
@@ -3369,6 +3646,9 @@ registerProcessor('samt-tap', SamtTap);
     $('muteStatus').textContent = shared.mutes.length ? String(shared.mutes.length) : 'None';
     // the session view
     $('resume').hidden = !paused; $('pass').hidden = paused || test; $('stop').hidden = paused; $('endSession').hidden = !paused;
+    $('sRec').hidden = test; $('sRec').classList.toggle('on', !!tape);
+    $('sRec').disabled = tapeWait || !!(session && (session.stopping || (paused && !session.holdPause && !tape)));
+    if (tape) $('sRec').setAttribute('aria-label', 'Stop recording'); else { $('sRec').removeAttribute('aria-label'); $('sRecText').textContent = 'Record'; }
     $('stopText').textContent = test ? 'Stop test' : 'Hold to pause'; $('stop').classList.toggle('hold', !test); $('stop').querySelector('.ring').style.display = test ? 'none' : '';
     $('sWhoSeg').querySelectorAll('button').forEach((b, i) => { b.disabled = paused || (i === 0 && !voiceUsable()); });
     // setup, step by step
@@ -3440,7 +3720,8 @@ registerProcessor('samt-tap', SamtTap);
     // what turns the echo on: Your voice (the voice check) or Sound level (the line); on Home, and mid-session
     const WHO = [{ v: 'voice', label: 'Your voice' }, { v: 'level', label: 'Sound level' }];
     whoCtl = seg($('whoSeg'), WHO, settings.who, setWho); sWhoCtl = seg($('sWhoSeg'), WHO, settings.who, setWho);
-    $('pass').onclick = talkFreely;
+    $('pass').onclick = () => { if (tape) setEchoOff(!(session && session.echoOff)); else talkFreely(); }; // while recording: the echo switch
+    $('sRec').onclick = () => { if (tape) endTape(''); else startTape(); };
     $('endSession').onclick = () => { if (session && session.paused) stopSession(false); };
     const applyConv = () => { if (ctrl && session && session.kind === 'conversation') Object.assign(ctrl.p, convParams()); render(); };
     const sw = (id, key) => { const el = $(id), sync = () => el.setAttribute('aria-checked', String(!!settings[key])); el.onclick = () => { settings[key] = !settings[key]; saveSettings(); sync(); applyConv(); }; sync(); };
@@ -3474,16 +3755,22 @@ registerProcessor('samt-tap', SamtTap);
     $('endDone').onclick = closeEnd; $('endClose').onclick = closeEnd; $('askClaude').onclick = askClaude;
     $('endDelete').onclick = () => {
       const r = endRec; if (!r) return;
-      ask({ title: 'Delete this session?', msg: 'It leaves the list and the totals.', actions: [{ label: 'Delete', danger: true, run: async () => { if (endRec === r) { endRec = null; closeSheet('end'); } await dropRecord(r.id); renderHistory(); renderToday(); } }] });
+      const clips = Array.isArray(r.clips) ? r.clips : [];
+      ask({ title: 'Delete this session?', msg: clips.length ? 'It leaves the list and the totals, and its recordings are deleted.' : 'It leaves the list and the totals.', actions: [{ label: 'Delete', danger: true, run: async () => {
+        if (endRec === r) { endRec = null; stopPlayers(); closeSheet('end'); }
+        await dropRecord(r.id); for (const c of clips) await blobs.del(c.id).catch(() => {});
+        renderHistory(); renderToday();
+      } }] });
     };
     // a line of text
     $('txtSave').onclick = () => endText(true); $('txtClose').onclick = () => endText(false);
     $('txtForm').addEventListener('submit', e => { e.preventDefault(); endText(true); });
-    const presets = seg($('presets'), [{ v: 15, label: '15 min' }, { v: 30, label: '30 min' }, { v: 60, label: '1 hr' }, { v: 120, label: '2 hr' }, { v: 240, label: '4 hr' }], settings.mins, v => { settings.mins = v; $('until').value = ''; saveSettings(); syncTimer(); });
-    const syncTimer = () => { $('minsOut').textContent = settings.mins; presets.set($('until').value ? null : settings.mins); $('clearUntil').hidden = !$('until').value; refreshReadout(); };
-    const stepMins = d => { settings.mins = Math.max(5, Math.min(720, settings.mins + d)); $('until').value = ''; saveSettings(); syncTimer(); };
-    $('minsDown').onclick = () => stepMins(settings.mins > 60 ? -15 : -5); $('minsUp').onclick = () => stepMins(settings.mins >= 60 ? 15 : 5);
-    $('until').oninput = syncTimer; $('clearUntil').onclick = () => { $('until').value = ''; syncTimer(); };
+    const presets = seg($('presets'), [{ v: 30, label: '30 min' }, { v: 60, label: '1 hr' }, { v: 120, label: '2 hr' }, { v: 480, label: '8 hr' }, { v: 960, label: '16 hr' }], settings.mins, v => { settings.mins = v; $('until').value = ''; saveSettings(); syncTimer(); });
+    const syncTimer = () => { $('minsOut').textContent = lenText(settings.mins); presets.set($('until').value ? null : settings.mins); $('clearUntil').hidden = !$('until').value; refreshReadout(); };
+    // − / +: 5 minutes under an hour, 15 up to 4 hours, then an hour at a time, up to 16 hours
+    const stepMins = d => { settings.mins = Math.max(5, Math.min(MAX_MINS, settings.mins + d)); $('until').value = ''; saveSettings(); syncTimer(); };
+    $('minsDown').onclick = () => stepMins(settings.mins > 240 ? -60 : settings.mins > 60 ? -15 : -5); $('minsUp').onclick = () => stepMins(settings.mins >= 240 ? 60 : settings.mins >= 60 ? 15 : 5);
+    $('until').oninput = () => { syncTimer(); if (untilMs() > MAX_MINS * 60000) toast('Sessions run up to 16 hours.'); }; $('clearUntil').onclick = () => { $('until').value = ''; syncTimer(); };
     const stepper = (key, down, up, out, step, lo, hi, fmtFn, apply) => {
       const show = () => { $(out).textContent = fmtFn(settings[key]); };
       $(down).onclick = () => { settings[key] = Math.max(lo, settings[key] - step); saveSettings(); show(); apply(); };
@@ -3523,13 +3810,14 @@ registerProcessor('samt-tap', SamtTap);
     goView('home', 'none');
     try { await loadHistory(); } catch (e) {}
     renderHistory(); renderToday(); render();
+    setTimeout(sweepTapes, 5000);
     setInterval(() => { if (!session) renderToday(true); }, 60000); // a new day starts at midnight
     document.addEventListener('visibilitychange', async () => { if (document.visibilityState === 'visible' && !session) { try { await loadHistory(); } catch (e) {} renderHistory(); renderToday(); } });
     // fetch the Amiri fonts once the page has settled, so a session's first reminder doesn't flash in another font
     setTimeout(() => { try { for (const f of ['"Amiri Quran"', 'Amiri', '"Samt Arabic"']) document.fonts.load('26px ' + f, 'ق').catch(() => {}); } catch (e) {} }, 2000);
     debug.history = () => history; debug.shared = shared; debug.view = () => view; debug.trouble = onTrouble;
     debug.wiz = () => ({ at: wizAt, states: WSTEPS.map(s => stepState(s.id)), check: wiz.check, done: wiz.done, strict: settings.strict, who: settings.who });
-    debug.session = () => session; debug.tick = () => tickSession(); // the tests move a pause's start back to reach its end
+    debug.session = () => session; debug.tick = () => tickSession(); debug.tape = () => tape; debug.blobs = blobs; debug.sweep = sweepTapes; // the tests move a pause's start back to reach its end
     debug.line = () => lineNow(); debug.setLine = setLine; debug.mutes = () => shared.mutes; debug.gate = () => gateTap;
     if (FAKE) { debug.feed = async (name, url) => { const b = await (await fetch(url)).arrayBuffer(); return mic.play(name, new Float32Array(b)); }; debug.ensureEngine = ensureMic; }
   }
