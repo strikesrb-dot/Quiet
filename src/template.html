@@ -350,6 +350,7 @@ body { min-height: 100vh; min-height: 100dvh; } /* the page colour (and a sessio
 .s-live .live { grid-column: 2; justify-self: center; }
 .s-live #lineUp { grid-column: 3; }
 .lvwrap { position: relative; min-width: 0; }
+body.no-level .lvwrap { display: none; } /* "Show the sound level bar" off: nothing in a session moves with the sound */
 .linemark { position: absolute; top: -8px; bottom: -8px; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--q-ink); pointer-events: none; }
 body.lv-mode .lvwrap .meter { height: 10px; }
 .meter > i { transition: background-color 120ms linear; }
@@ -505,7 +506,8 @@ body.lv-mode .lvwrap .meter { height: 10px; }
     </section>
     <section class="sec" aria-labelledby="capLook">
       <h3 class="cap" id="capLook">Appearance</h3>
-      <div class="group"><div class="row full"><div class="seg" id="themeSeg" role="radiogroup" aria-labelledby="capLook"></div></div></div>
+      <div class="group"><div class="row full"><div class="seg" id="themeSeg" role="radiogroup" aria-labelledby="capLook"></div></div>
+        <button class="row" id="swLevel" type="button" role="switch" aria-checked="true"><span class="rt">Show the sound level bar</span><span class="sw" aria-hidden="true"></span></button></div>
     </section>
     <section class="sec" aria-labelledby="capDevice">
       <h3 class="cap" id="capDevice">This device</h3>
@@ -657,6 +659,7 @@ body.lv-mode .lvwrap .meter { height: 10px; }
   </div>
   <div class="group">
     <div class="row"><span class="rt" id="dVolLabel">Echo volume</span><div class="stp" role="group" aria-labelledby="dVolLabel"><button id="dVolDown" type="button" aria-label="Quieter">−</button><output id="dVolOut"></output><button id="dVolUp" type="button" aria-label="Louder">+</button></div></div>
+    <button class="row" id="dLevel" type="button" role="switch" aria-checked="true"><span class="rt">Show the sound level bar</span><span class="sw" aria-hidden="true"></span></button>
     <button class="row" id="dMute" type="button"><span class="rt">Muted sounds</span><span class="rv" id="muteStatus2"></span><svg class="ic chev"><use href="#i-chev"/></svg></button>
   </div>
   <p class="hint" id="tlHint">You and Others: how much of the talking Samt heard was you.</p>

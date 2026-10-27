@@ -41,12 +41,13 @@
   const LINE_MIN = -66, LINE_MAX = -16, MAX_MUTES = 4;
   const clampLine = v => Math.max(LINE_MIN, Math.min(LINE_MAX, Math.round(v)));
   const okTone = t => t && Number.isFinite(+t.f) && +t.f >= 40 && +t.f <= 7600 && Number.isFinite(+t.q) && +t.q > 0;
-  const SDEF = { budget: 20, remind: true, sign: "I'm keeping quiet", cards: [], remindAt: 0, line: null, mutes: [] };
+  const SDEF = { budget: 20, remind: true, sign: "I'm keeping quiet", cards: [], remindAt: 0, line: null, mutes: [], showLevel: true };
   const shared = Object.assign({}, SDEF, (() => { try { return JSON.parse(localStorage.getItem('samt.shared') || '{}'); } catch (e) { return {}; } })());
   shared.budget = Math.max(5, Math.min(240, Math.round(+shared.budget || 20))); if (!Array.isArray(shared.cards)) shared.cards = [];
   const cleanMutes = list => (Array.isArray(list) ? list : []).filter(m => m && Array.isArray(m.tones) && m.tones.length && m.tones.every(okTone))
     .map(m => ({ id: String(m.id || 'm' + Date.now().toString(36)), kind: ['hum', 'tone', 'whine'].includes(m.kind) ? m.kind : 'tone', tones: m.tones.slice(0, 6).map(t => ({ f: +t.f, q: +t.q })), at: +m.at || 0 })).slice(-MAX_MUTES);
   shared.line = shared.line == null || !Number.isFinite(+shared.line) ? null : clampLine(+shared.line); shared.mutes = cleanMutes(shared.mutes);
+  shared.showLevel = shared.showLevel !== false; // the level bar in a session (Settings, Appearance; and Details)
   const saveShared = () => { try { localStorage.setItem('samt.shared', JSON.stringify(shared)); } catch (e) {} };
   /* Talk freely: 20 s a tap (up to 60 s at once). Any 3 taps within 10 minutes turn it off for an hour, across sessions
      and in Light and Neural alike (shared.freeTaps: recent tap times; shared.freeLock: when it's back). */
@@ -265,7 +266,7 @@
   function backup() {
     // phrases: none recorded; the field is there only so a v6 page (which expects it) can still restore this file
     const data = { app: 'samt', mode: MODE, version: 4, saved: new Date().toISOString(), settings, profile: S.mic.pack(profile), voice: voice && voice.ready ? S.mic.pack(voice.toJSON()) : null,
-      phrases: S.mic.pack(new S.pipeline.PhraseBook().toJSON()), shared: { budget: shared.budget, remind: shared.remind, sign: shared.sign, cards: shared.cards, line: shared.line, mutes: shared.mutes }, history };
+      phrases: S.mic.pack(new S.pipeline.PhraseBook().toJSON()), shared: { budget: shared.budget, remind: shared.remind, sign: shared.sign, cards: shared.cards, line: shared.line, mutes: shared.mutes, showLevel: shared.showLevel }, history };
     const url = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: 'application/json' }));
     const a = document.createElement('a'); a.href = url; a.download = `samt-${MODE}-backup-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000);
@@ -285,6 +286,7 @@
         if (Array.isArray(d.shared.cards)) shared.cards = d.shared.cards.filter(c => typeof c === 'string' && c.trim()).map(c => c.slice(0, 120)).slice(-24);
         if (d.shared.line != null && Number.isFinite(+d.shared.line)) shared.line = clampLine(+d.shared.line);
         if (Array.isArray(d.shared.mutes)) { shared.mutes = cleanMutes(d.shared.mutes); applyMutes(); }
+        if (typeof d.shared.showLevel === 'boolean') { shared.showLevel = d.shared.showLevel; applyLevelShow(); }
         saveShared();
       }
       if (Array.isArray(d.history)) {
@@ -425,6 +427,12 @@
     for (const g of [ctrl, check && check.ctrl]) if (g && g.kind === 'level') g.p.line = shared.line;
     renderLine();
   }
+  /* Show the sound level bar: off hides the bar (and the line on it) in a session, for Light and Neural alike. */
+  function applyLevelShow() {
+    document.body.classList.toggle('no-level', !shared.showLevel);
+    for (const id of ['swLevel', 'dLevel']) $(id).setAttribute('aria-checked', String(shared.showLevel));
+  }
+  function nudgeLine(d) { setLine(lineNow() + d); if (!shared.showLevel) toast($('lineSr').textContent + '.'); } // with no bar to see it on
   function renderLine() {
     const v = lineNow(), x = Math.max(0, Math.min(1, (v + 70) / 55));
     $('lineMark').style.left = (100 * x).toFixed(1) + '%';
@@ -1612,7 +1620,9 @@
     $('toMute').onclick = $('dMute').onclick = openMutes;
     $('muteClose').onclick = () => closers.mute();
     $('muteGo').onclick = muteSound;
-    $('lineDown').onclick = () => setLine(lineNow() - 2); $('lineUp').onclick = () => setLine(lineNow() + 2);
+    $('lineDown').onclick = () => nudgeLine(-2); $('lineUp').onclick = () => nudgeLine(2);
+    for (const id of ['swLevel', 'dLevel']) $(id).onclick = () => { shared.showLevel = !shared.showLevel; saveShared(); applyLevelShow(); };
+    applyLevelShow();
     document.addEventListener('click', e => { if (e.target.closest('[data-back]')) { e.preventDefault(); goBack(); } });
     $('readout').onclick = () => openSheet('timer');
     $('timerClose').onclick = $('timerDone').onclick = () => closeSheet('timer');
