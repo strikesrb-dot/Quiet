@@ -20,7 +20,8 @@ node tests/live.js                       # after a deploy: live bytes = site/, f
   through). The setup's check uses voices from the test stream that never taught Samt (your talk, then two men's):
   Light caught you 7 of 7 but ignored the men only 1 of 6, even stricter; Neural 7 of 7 and 6 of 6. The `stretches`
   line shows each one (E echo to the end, e echo then off, - none).
-- `features.js` and `sound-level.js` end `ALL PASS` or `N FAILED`. `sound-level.js` also prints how the line split the
+- `features.js` and `sound-level.js` end `ALL PASS` or `N FAILED`. `sound-level.js` also turns the sound level bar off
+  from Details (Settings' switch follows, it's kept on the device, − / + still move the line and say where) and on. `sound-level.js` also prints how the line split the
   stream (line −24 dB): with the other voices 15 dB quieter, 100% of your talk echoed and 100% of theirs ignored; with
   them as loud as yours, only 40% of theirs ignored (the hard male voice never). Its sounds are made in the page:
   the stream with the others at a gain, a 150 · 300 · 450 Hz hum, white noise, a 2 ms click.

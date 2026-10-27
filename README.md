@@ -27,7 +27,10 @@ How it is laid out, by stage (Home shows only what fits where you are):
   up to 60 seconds (the echo stops, the mic's sound is set aside and the clock stands still; the pill counts down "Echo
   back in 0:45", then the echo is back by itself); Resume ends the pause early and End session finishes the session; a
   test stops with a tap. A call or Siri pauses it too, until you tap Resume. Details (the numbers, a correction for the last verdict with Your voice, echo
-  volume, muted sounds) opens as a sheet. The browser's Back can't leave a running session.
+  volume, the sound level bar, muted sounds) opens as a sheet. The browser's Back can't leave a running session.
+  **Show the sound level bar** (Settings › Appearance, and Details) is on by default; off hides the moving bar and
+  its line in a session, for Light and Neural alike (`samt.shared.showLevel`). With Sound level, − and + still move
+  the line and say where it is ("Line 23 of 26.").
 - **Afterwards**, the end sheet: the numbers, the session's recordings, a mood, a note, and Claude's summary if you
   ask for it.
 - **Progress**: today against the daily talk budget, days within it, the last 7 days as a chart, past sessions.

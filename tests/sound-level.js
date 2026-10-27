@@ -86,6 +86,19 @@ let fails = 0; const ok = (c, s) => { console.log(`[${engine} ${mode}] ${c ? 'PA
     await page.click('#lineUp'); const l1 = await line(), m1 = await page.$eval('#lineMark', e => parseFloat(e.style.left));
     ok(l1 === l0 + 2 && m1 > m0 && (await page.evaluate(() => SamtDebug.ctrl.p.line)) === l1, `+ raises the line ${l0} → ${l1} (mark ${m0}% → ${m1}%), live in the session`);
     await page.click('#lineDown'); ok((await line()) === l0, '− lowers it back: ' + await line());
+    // the bar can be hidden (a session's Details, or Settings › Appearance): nothing moves with the sound; − / + still
+    // move the line and say where it is
+    await page.click('#detailsBtn'); await page.waitForSelector('#detailsPanel.show'); await sleep(250);
+    ok((await page.getAttribute('#dLevel', 'aria-checked')) === 'true' && await page.isVisible('.lvwrap .meter'), 'the sound level bar shows by default');
+    await page.click('#dLevel'); await sleep(150);
+    await page.click('#detailsClose'); await page.waitForSelector('#detailsPanel', { state: 'hidden' });
+    const hid = await page.evaluate(() => ({ bar: !!document.querySelector('.lvwrap').offsetParent, body: document.body.classList.contains('no-level'), sw: document.querySelector('#swLevel').getAttribute('aria-checked'), kept: JSON.parse(localStorage.getItem('samt.shared')).showLevel }));
+    await page.click('#lineUp'); await sleep(100);
+    const tl = await page.textContent('#toast'), lU = await line();
+    ok(!hid.bar && hid.body && hid.sw === 'false' && hid.kept === false && lU === l0 + 2 && /^Line \d+ of \d+\.$/.test(tl), `bar hidden (Settings' switch off too, kept on the device); + still moves the line (${l0} → ${lU}) and says "${tl}"`);
+    await page.click('#lineDown');
+    await page.click('#detailsBtn'); await page.waitForSelector('#detailsPanel.show'); await page.click('#dLevel'); await page.click('#detailsClose'); await page.waitForSelector('#detailsPanel', { state: 'hidden' });
+    ok(await page.isVisible('.lvwrap .meter') && (await page.getAttribute('#swLevel', 'aria-checked')) === 'true' && (await line()) === l0, 'turned back on: the bar is back');
     await page.evaluate(() => { SamtDebug.events.length = 0; });
     await page.evaluate(() => { const x = new Float32Array(16000); for (let i = 8000; i < 8032; i++) x[i] = 0.3; return __T.play('click', x); }); await sleep(300);
     ok((await echoStates()) === 0, 'a click (2 ms, loud) does not turn the echo on');
